@@ -12,7 +12,7 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsup src/index.ts src/cli.ts --format esm --dts",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
