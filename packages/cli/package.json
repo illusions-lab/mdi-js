@@ -25,11 +25,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@illusions-lab/mdi-export-profile": "workspace:*",
     "@illusions-lab/mdi-remark": "workspace:*",
     "@illusions-lab/mdi-to-html": "workspace:*",
     "@illusions-lab/mdi-to-pdf": "workspace:*",
     "@illusions-lab/mdi-to-epub": "workspace:*",
     "@illusions-lab/mdi-to-docx": "workspace:*",
+    "mdast-util-mdi": "workspace:*",
     "remark-parse": "^11.0.0",
     "unified": "^11.0.0",
     "@types/mdast": "^4.0.0"

@@ -53,6 +53,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@illusions-lab/mdi-export-profile':
+        specifier: workspace:*
+        version: link:../export-profile
       '@illusions-lab/mdi-remark':
         specifier: workspace:*
         version: link:../remark
@@ -71,6 +74,9 @@ importers:
       '@types/mdast':
         specifier: ^4.0.0
         version: 4.0.4
+      mdast-util-mdi:
+        specifier: workspace:*
+        version: link:../mdast-util-mdi
       remark-parse:
         specifier: ^11.0.0
         version: 11.0.0
@@ -90,6 +96,18 @@ importers:
       vitest:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@20.19.43)(lightningcss@1.32.0)
+
+  packages/export-profile:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.1(postcss@8.5.19)(typescript@5.9.3)(yaml@2.9.0)
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@25.9.5)(lightningcss@1.32.0)
 
   packages/mdast-util-mdi:
     dependencies:
@@ -183,6 +201,9 @@ importers:
 
   packages/to-docx:
     dependencies:
+      '@illusions-lab/mdi-export-profile':
+        specifier: workspace:*
+        version: link:../export-profile
       '@types/mdast':
         specifier: ^4.0.0
         version: 4.0.4
@@ -220,6 +241,9 @@ importers:
 
   packages/to-epub:
     dependencies:
+      '@illusions-lab/mdi-export-profile':
+        specifier: workspace:*
+        version: link:../export-profile
       '@illusions-lab/mdi-to-hast':
         specifier: workspace:*
         version: link:../to-hast
@@ -328,6 +352,9 @@ importers:
 
   packages/to-pdf:
     dependencies:
+      '@illusions-lab/mdi-export-profile':
+        specifier: workspace:*
+        version: link:../export-profile
       '@illusions-lab/mdi-to-html':
         specifier: workspace:*
         version: link:../to-html
