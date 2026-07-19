@@ -3,7 +3,7 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { mdi } from "micromark-extension-mdi";
 import type { Paragraph, Root, Text } from "mdast";
 import { mdiFromMarkdown } from "./from-markdown.js";
-import type { MdiEm, MdiRuby, MdiTcy } from "./types.js";
+import type { MdiEm, MdiKern, MdiNoBreak, MdiRuby, MdiTcy, MdiWarichu } from "./types.js";
 
 function parse(value: string): Root {
 	return fromMarkdown(value, {
@@ -16,6 +16,23 @@ function firstParagraphChildren(tree: Root) {
 	const paragraph = tree.children[0] as Paragraph;
 	expect(paragraph.type).toBe("paragraph");
 	return paragraph.children;
+}
+
+// Nodes built via `this.enter()`/`this.exit()` carry `position` (unlike the
+// hand-rolled text nodes some MDI handlers assign directly) — strip it so
+// structural assertions don't have to spell out every position too.
+function withoutPosition(value: unknown): unknown {
+	if (Array.isArray(value)) {
+		return value.map(withoutPosition);
+	}
+	if (value && typeof value === "object") {
+		const { position: _position, ...rest } = value as Record<string, unknown>;
+		for (const key of Object.keys(rest)) {
+			rest[key] = withoutPosition(rest[key]);
+		}
+		return rest;
+	}
+	return value;
 }
 
 describe("mdiRuby", () => {
@@ -159,5 +176,63 @@ describe("mdiBotenAlias", () => {
 	it("keeps alias content as plain text", () => {
 		const children = firstParagraphChildren(parse("《《^12^》》"));
 		expect((children[0] as MdiEm).children).toEqual([{ type: "text", value: "^12^" }]);
+	});
+});
+
+describe("mdiBracketMacro", () => {
+	it("parses the void br macro", () => {
+		const node = firstParagraphChildren(parse("a[[br]]b"))[1];
+		expect(withoutPosition(node)).toEqual({ type: "mdiBreak" });
+	});
+
+	it("parses no-break", () => {
+		const node = firstParagraphChildren(parse("[[no-break:keep together]]"))[0] as MdiNoBreak;
+		expect(withoutPosition(node)).toEqual({ type: "mdiNoBreak", children: [{ type: "text", value: "keep together" }] });
+	});
+
+	it("parses em with its default mark", () => {
+		const node = firstParagraphChildren(parse("[[em:dot]]"))[0] as MdiEm;
+		expect(withoutPosition(node)).toEqual({ type: "mdiEm", mark: "﹅", children: [{ type: "text", value: "dot" }] });
+	});
+
+	it("disambiguates an em mark parameter", () => {
+		const marked = firstParagraphChildren(parse("[[em:●:それ]]"))[0] as MdiEm;
+		expect(withoutPosition(marked)).toEqual({ type: "mdiEm", mark: "●", children: [{ type: "text", value: "それ" }] });
+		const unmarked = firstParagraphChildren(parse("[[em:ab:cd]]"))[0] as MdiEm;
+		expect(withoutPosition(unmarked)).toEqual({ type: "mdiEm", mark: "﹅", children: [{ type: "text", value: "ab:cd" }] });
+	});
+
+	it("parses warichu", () => {
+		const node = firstParagraphChildren(parse("[[warichu:small note]]"))[0] as MdiWarichu;
+		expect(withoutPosition(node)).toEqual({ type: "mdiWarichu", children: [{ type: "text", value: "small note" }] });
+	});
+
+	it("parses kern", () => {
+		const node = firstParagraphChildren(parse("[[kern:-0.1em:tight]]"))[0] as MdiKern;
+		expect(withoutPosition(node)).toEqual({ type: "mdiKern", amount: "-0.1em", children: [{ type: "text", value: "tight" }] });
+	});
+
+	it("keeps invalid macros literal", () => {
+		for (const value of ["[[kern:bad:text]]", "[[br:x]]", "[[no-break:]]", "[[em:foo"]) {
+			const children = firstParagraphChildren(parse(value));
+			expect(children).toHaveLength(1);
+			expect(withoutPosition(children[0])).toEqual({ type: "text", value });
+		}
+	});
+
+	it("nests ruby and bracket macros", () => {
+		const ruby = firstParagraphChildren(parse("[[em:{東京|とうきょう}]]"))[0] as MdiEm;
+		expect(withoutPosition(ruby.children)).toEqual([{ type: "mdiRuby", base: "東京", ruby: "とうきょう" }]);
+		const em = firstParagraphChildren(parse("[[em:foo[[no-break:bar]]baz]]"))[0] as MdiEm;
+		expect(withoutPosition(em.children)).toEqual([
+			{ type: "text", value: "foo" },
+			{ type: "mdiNoBreak", children: [{ type: "text", value: "bar" }] },
+			{ type: "text", value: "baz" },
+		]);
+	});
+
+	it("does not close on an escaped bracket", () => {
+		const node = firstParagraphChildren(parse(String.raw`[[em:foo\]bar]]`))[0] as MdiEm;
+		expect(withoutPosition(node.children)).toEqual([{ type: "text", value: "foo]bar" }]);
 	});
 });
