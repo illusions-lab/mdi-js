@@ -1,5 +1,5 @@
 import type { Extension as FromMarkdownExtension } from "mdast-util-from-markdown";
-import type { MdiRuby } from "./types.js";
+import type { MdiEm, MdiRuby, MdiTcy } from "./types.js";
 import { unescapeMdi } from "./unescape.js";
 import { graphemes } from "./graphemes.js";
 
@@ -16,6 +16,12 @@ export function mdiFromMarkdown(): FromMarkdownExtension {
 			mdiRuby(token) {
 				this.enter({ type: "mdiRuby", base: "", ruby: "" }, token);
 			},
+			mdiTcy(token) {
+				this.enter({ type: "mdiTcy", value: "" }, token);
+			},
+			mdiBotenAlias(token) {
+				this.enter({ type: "mdiEm", mark: "﹅", children: [] }, token);
+			},
 		},
 		exit: {
 			mdiRubyBase(token) {
@@ -27,6 +33,20 @@ export function mdiFromMarkdown(): FromMarkdownExtension {
 				node.ruby = resolveRuby(node.base, unescapeMdi(this.sliceSerialize(token)));
 			},
 			mdiRuby(token) {
+				this.exit(token);
+			},
+			mdiTcyText(token) {
+				const node = this.stack[this.stack.length - 1] as MdiTcy;
+				node.value = unescapeMdi(this.sliceSerialize(token));
+			},
+			mdiTcy(token) {
+				this.exit(token);
+			},
+			mdiBotenAliasText(token) {
+				const node = this.stack[this.stack.length - 1] as MdiEm;
+				node.children = [{ type: "text", value: unescapeMdi(this.sliceSerialize(token)) }];
+			},
+			mdiBotenAlias(token) {
 				this.exit(token);
 			},
 		},

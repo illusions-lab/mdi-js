@@ -1,6 +1,9 @@
 import type { Extension } from "micromark-util-types";
 import { codes } from "micromark-util-symbol";
+import { botenAlias } from "./syntax/boten-alias.js";
 import { ruby } from "./syntax/ruby.js";
+import { tcy } from "./syntax/tcy.js";
+import { mdiConstructs } from "./types.js";
 
 export const MDI_SPEC_VERSION = "2.0";
 
@@ -15,6 +18,8 @@ export function mdi(): Extension {
 	return {
 		text: {
 			[codes.leftCurlyBrace]: ruby,
+			[mdiConstructs.tcy.triggers[0]!]: tcy,
+			[mdiConstructs.botenAlias.triggers[0]!]: botenAlias,
 		},
 	};
 }
