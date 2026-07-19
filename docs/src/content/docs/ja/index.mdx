@@ -1,0 +1,39 @@
+---
+title: mdi-js
+description: illusion Markdown (MDI) のための Node.js ツール群 — .mdi ファイルを解析し、HTML・PDF・EPUB・DOCX へ変換します。
+template: splash
+hero:
+  tagline: illusion Markdown (MDI) のための Node.js ツール群 — .mdi ファイルを解析し、HTML・PDF・EPUB・DOCX へ変換します。
+  actions:
+    - text: はじめに
+      link: /mdi-js/ja/guides/getting-started/
+      icon: right-arrow
+    - text: MDI 2.0 仕様書
+      link: https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+	<Card title="ひとつのツリー、4 つの出力" icon="seti:html">
+		すべてのコンバータは `@illusions-lab/mdi-remark` が生成する同一の
+		mdast ツリーを消費するため、エディタ側とエクスポート側の挙動が
+		分岐しません。HTML・PDF・EPUB は mdast → hast 変換を共有し、DOCX
+		はネイティブ OOXML へ直接マッピングします。
+	</Card>
+	<Card title="本物の日本語組版" icon="translate">
+		ルビ・縦中横・傍点・割注・字間調整・縦書き — 後処理ハックではなく、
+		第一級の構文として解析されます。[ライブ・ショーケース](/mdi-js/ja/syntax/showcase/)
+		をご覧ください。このサイト自体が mdi-js のパーサで MDI を描画しています。
+	</Card>
+	<Card title="unified ベース" icon="puzzle">
+		micromark 構文拡張と mdast ユーティリティは、既存の remark/rehype
+		パイプラインにそのまま組み込めます — このページを生成した
+		パイプラインもその一つです。
+	</Card>
+	<Card title="CLI 同梱" icon="seti:shell">
+		`mdi build novel.mdi --to pdf` — 原稿から成果物まで 1 コマンド。
+	</Card>
+</CardGrid>

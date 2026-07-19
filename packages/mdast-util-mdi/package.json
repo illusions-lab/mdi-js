@@ -1,6 +1,6 @@
 {
   "name": "mdast-util-mdi",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "mdast extension for MDI 2.0 (illusion Markdown) nodes",
   "license": "MIT",
   "type": "module",
@@ -23,7 +23,9 @@
   "dependencies": {
     "micromark-extension-mdi": "workspace:*",
     "mdast-util-from-markdown": "^2.0.0",
-    "mdast-util-to-markdown": "^2.1.0"
+    "mdast-util-to-markdown": "^2.1.0",
+    "@types/mdast": "^4.0.0",
+    "@types/unist": "^3.0.0"
   },
   "devDependencies": {
     "tsup": "^8.3.0",

@@ -7,6 +7,8 @@
 This repository targets **MDI 2.0** ([spec](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md)).  
 本リポジトリは **MDI 2.0**（[仕様書](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md)）に対応します。
 
+**📖 Documentation / ドキュメント: https://illusions-lab.github.io/mdi-js/** — guides, a live-rendered syntax showcase, and generated API reference (English / 日本語 / 正體中文). Built from [`docs/`](./docs).
+
 ---
 
 ## Packages / パッケージ構成

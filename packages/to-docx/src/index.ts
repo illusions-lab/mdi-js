@@ -1,1 +1,44 @@
+import { Document, HeadingLevel, ImportedXmlComponent, Packer, PageBreak, PageTextDirectionType, Paragraph, TextRun } from "docx";
+import type { Root, RootContent, PhrasingContent } from "mdast";
+import type {} from "mdast-util-mdi";
+import type {} from "@illusions-lab/mdi-remark";
+
 export const MDI_SPEC_VERSION = "2.0";
+
+export async function mdiToDocx(tree: Root): Promise<Buffer> {
+	const children = tree.children.flatMap(block);
+	const vertical = tree.data?.frontmatter?.writingMode === "vertical";
+	const document = new Document({ sections: [{ children, properties: vertical ? { page: { textDirection: PageTextDirectionType.TOP_TO_BOTTOM_RIGHT_TO_LEFT } } : undefined }], title: tree.data?.frontmatter?.title, creator: tree.data?.frontmatter?.author });
+	return Packer.toBuffer(document);
+}
+
+function block(node: RootContent): Paragraph[] {
+	if (node.type === "heading") return [new Paragraph({ heading: [HeadingLevel.HEADING_1, HeadingLevel.HEADING_2, HeadingLevel.HEADING_3, HeadingLevel.HEADING_4, HeadingLevel.HEADING_5, HeadingLevel.HEADING_6][node.depth - 1], children: inline(node.children) })];
+	if (node.type === "paragraph") return [new Paragraph({ children: inline(node.children) })];
+	if (node.type === "list") return node.children.flatMap(item => item.children.filter(n => n.type === "paragraph").map(n => new Paragraph({ children: inline(n.children), bullet: { level: 0 } })));
+	if (node.type === "mdiPagebreak") return [new Paragraph({ children: [new PageBreak()] })];
+	if (node.type === "mdiBlank") return [new Paragraph("")];
+	return [];
+}
+
+function inline(nodes: PhrasingContent[]): TextRun[] {
+	return nodes.flatMap(node => {
+		if (node.type === "text") return [new TextRun(node.value)];
+		if (node.type === "break" || node.type === "mdiBreak") return [new TextRun({ break: 1 })];
+		if (node.type === "emphasis") return [new TextRun({ italics: true, children: inline(node.children) })];
+		if (node.type === "strong") return [new TextRun({ bold: true, children: inline(node.children) })];
+		if (node.type === "delete") return [new TextRun({ strike: true, children: inline(node.children) })];
+		if (node.type === "mdiRuby") return [rawRun(rubyXml(node.base, node.ruby))];
+		if (node.type === "mdiTcy") return [rawRun(`<w:r><w:rPr><w:eastAsianLayout w:combine="1" w:combineBrackets="none"/></w:rPr><w:t>${xml(node.value)}</w:t></w:r>`)];
+		if ("children" in node) return inline(node.children as PhrasingContent[]);
+		return [];
+	});
+}
+
+// ECMA-376 w:ruby stores the reading in rubyText and the base in rubyBase.
+function rubyXml(base: string, reading: string | string[]): string {
+	const text = Array.isArray(reading) ? reading.join(".") : reading;
+	return `<w:ruby><w:rubyPr><w:rubyAlign w:val="center"/><w:hps w:val="12"/><w:hpsRaise w:val="18"/><w:hpsBaseText w:val="24"/></w:rubyPr><w:rt><w:r><w:t>${xml(text)}</w:t></w:r></w:rt><w:rubyBase><w:r><w:t>${xml(base)}</w:t></w:r></w:rubyBase></w:ruby>`;
+}
+function rawRun(xmlString: string): TextRun { return ImportedXmlComponent.fromXmlString(xmlString) as unknown as TextRun; }
+function xml(value: string): string { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;"); }

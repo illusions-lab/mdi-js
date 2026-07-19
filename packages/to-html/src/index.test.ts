@@ -1,0 +1,44 @@
+import { describe, expect, it } from "vitest";
+import { unified } from "unified";
+import remarkParse from "remark-parse";
+import remarkMdi from "@illusions-lab/mdi-remark";
+import type { Root } from "mdast";
+import { mdiToHtml } from "./index.js";
+import { MDI_STYLESHEET } from "@illusions-lab/mdi-to-hast";
+
+function parse(source: string): Root {
+	const processor = unified().use(remarkParse).use(remarkMdi);
+	return processor.runSync(processor.parse(source)) as Root;
+}
+describe("mdiToHtml", () => it("wraps rendered MDI in a vertical HTML document", () => {
+	const html = mdiToHtml(parse("---\ntitle: 雪女\nlang: ja\nwriting-mode: vertical\n---\n{東京|とうきょう} ^12^"));
+	expect(html).toContain('<html lang="ja" style="writing-mode: vertical-rl;">');
+	expect(html).toContain("<title>雪女</title>");
+	expect(html).toContain("<style>");
+	expect(html).toContain('<ruby class="mdi-ruby">東京<rp>（</rp><rt>とうきょう</rt>');
+}));
+
+describe("mdiToHtml edge cases", () => {
+	it("uses horizontal Japanese defaults without a title when front matter is absent", () => {
+		const html = mdiToHtml(parse("plain text"));
+		expect(html).toContain('<html lang="ja">');
+		expect(html).not.toContain("<title>");
+		expect(html).not.toContain("writing-mode:");
+	});
+
+	it("escapes HTML-special title and language values", () => {
+		const html = mdiToHtml(parse('---\ntitle: "A < B & \\"quoted\\""\nlang: "ja<&\\""\n---\ntext'));
+		expect(html).toContain('<html lang="ja&lt;&amp;&quot;">');
+		expect(html).toContain("<title>A &lt; B &amp; &quot;quoted&quot;</title>");
+	});
+
+	it("embeds the shared stylesheet verbatim", () => {
+		// Ruby and tate-chu-yoko have no dedicated CSS block in SYNTAX.md
+		// (<ruby>/<rt>/<rp> are styled natively; text-combine-upright is
+		// mentioned only in prose) - .mdi-em/.mdi-kern are constructs that do.
+		const html = mdiToHtml(parse("text"));
+		expect(html).toContain(MDI_STYLESHEET);
+		expect(html).toContain(".mdi-em");
+		expect(html).toContain("letter-spacing");
+	});
+});

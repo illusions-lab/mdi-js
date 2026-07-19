@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
 
 jobs:
@@ -15,10 +15,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      # to-pdf's tests print through a real headless Chromium.
+      - run: pnpm --filter @illusions-lab/mdi-to-pdf exec playwright install --with-deps chromium
       - run: pnpm typecheck
       - run: pnpm build
       - run: pnpm test
