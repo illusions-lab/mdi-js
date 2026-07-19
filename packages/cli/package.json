@@ -3,6 +3,13 @@
   "version": "2.0.3",
   "description": "Command-line interface for converting MDI (.mdi) documents",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/illusions-lab/mdi-js.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://illusions-lab.github.io/mdi-js/",
+  "bugs": "https://github.com/illusions-lab/mdi-js/issues",
   "type": "module",
   "bin": {
     "mdi": "./dist/cli.js"
