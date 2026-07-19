@@ -20,18 +20,7 @@ export function mdiToHast(tree: Root): MdiToHastResult {
 			allowDangerousHtml: false,
 			// Footnotes retain mdast-util-to-hast's default structure and classes.
 			clobberPrefix: "",
-			handlers: {
-				mdiRuby,
-				mdiTcy,
-				mdiBreak,
-				mdiBlank,
-				mdiEm,
-				mdiNoBreak: phrasing("mdi-nobr"),
-				mdiWarichu: phrasing("mdi-warichu"),
-				mdiKern,
-				mdiPagebreak,
-				paragraph,
-			},
+			handlers: mdiHandlers,
 		}) as HastRoot,
 		frontmatter: tree.data?.frontmatter,
 	};
@@ -134,4 +123,24 @@ const paragraph: Handler = (state, node) => {
 		if (node.data.mdiBottom > 0) properties.style = `--mdi-shift:${node.data.mdiBottom};`;
 	}
 	return element(state, node, "p", properties, state.all(node));
+};
+
+/**
+ * The mdast→hast handler table used by `mdiToHast`, exported so existing
+ * `remark-rehype` / `mdast-util-to-hast` pipelines (e.g. Astro's
+ * `markdown.remarkRehype.handlers`) can render MDI nodes without adopting
+ * `mdiToHast` itself. Includes a `paragraph` override that applies
+ * block-alignment data (`[[indent:N]]` / `[[bottom]]`) as classes.
+ */
+export const mdiHandlers: Record<string, Handler> = {
+	mdiRuby,
+	mdiTcy,
+	mdiBreak,
+	mdiBlank,
+	mdiEm,
+	mdiNoBreak: phrasing("mdi-nobr"),
+	mdiWarichu: phrasing("mdi-warichu"),
+	mdiKern,
+	mdiPagebreak,
+	paragraph,
 };

@@ -1,0 +1,37 @@
+---
+title: mdi-js
+description: illusion Markdown (MDI) 的 Node.js 工具鏈 — 解析 .mdi 檔案並轉換為 HTML、PDF、EPUB、DOCX。
+template: splash
+hero:
+  tagline: illusion Markdown (MDI) 的 Node.js 工具鏈 — 解析 .mdi 檔案並轉換為 HTML、PDF、EPUB、DOCX。
+  actions:
+    - text: 快速上手
+      link: /mdi-js/zh-tw/guides/getting-started/
+      icon: right-arrow
+    - text: MDI 2.0 規範
+      link: https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+	<Card title="一棵樹，四種輸出" icon="seti:html">
+		所有轉換器都消費 `@illusions-lab/mdi-remark` 產生的同一棵 mdast
+		樹，編輯器路徑與匯出路徑的行為永不分歧。HTML、PDF、EPUB 共享同一套
+		mdast → hast 映射；DOCX 直接映射到原生 OOXML。
+	</Card>
+	<Card title="貨真價實的日文排版" icon="translate">
+		ルビ（注音假名）、縦中横、傍點、割注、字距調整、直書 — 全部作為
+		第一級語法解析，不是後處理補丁。看看[即時渲染展示](/mdi-js/zh-tw/syntax/showcase/)：
+		本網站就是用 mdi-js 自己的解析器渲染 MDI 的。
+	</Card>
+	<Card title="建立在 unified 之上" icon="puzzle">
+		micromark 語法擴充與 mdast 工具可直接插入任何既有的 remark/rehype
+		管線 — 包括產生這個頁面的那一條。
+	</Card>
+	<Card title="附帶 CLI" icon="seti:shell">
+		`mdi build novel.mdi --to pdf` — 從書稿到交付檔一行指令。
+	</Card>
+</CardGrid>
