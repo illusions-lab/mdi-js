@@ -177,9 +177,9 @@ function resolveEm(node: MdiEm, source: string): void {
 	const raw = source.slice("[[em:".length, -2);
 	const first = bareColon(raw);
 	if (first < 0) return;
-	const mark = raw.slice(0, first);
+	const mark = unescapeMdi(raw.slice(0, first));
 	if (graphemes(mark).length !== 1 || /[\s\p{Cc}]/u.test(mark)) return;
-	node.mark = unescapeMdi(mark);
+	node.mark = mark;
 	const prefix = mark + ":";
 	const firstChild = node.children[0];
 	if (firstChild?.type === "text" && firstChild.value.startsWith(prefix)) {
