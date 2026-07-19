@@ -1,0 +1,138 @@
+---
+mdi: "2.0"
+title: 雪女
+author: 小泉八雲
+lang: ja
+date: 2026-07-19
+writing-mode: vertical
+page-progression: rtl
+---
+
+# 序 — Kitchen Sink
+
+このドキュメントは MDI 2.0 の全機能と、継承された標準 Markdown 構文を一つのファイルにまとめた確認用サンプルです。
+This document exercises every MDI 2.0 extension alongside inherited standard Markdown syntax, as a parser/renderer test fixture.
+
+## 標準 Markdown / Standard Markdown
+
+- 箇条書き item 1
+- 箇条書き item 2
+  - ネストしたリスト item
+
+1. 番号付きリスト
+2. 二番目の項目
+
+> これは引用ブロックです。
+> Blockquote, second line.
+
+`インラインコード` と、コードブロック:
+
+```js
+const x = 1;
+console.log(x);
+```
+
+[リンクの例](https://github.com/illusions-lab/MDI) と ![代替テキスト](https://example.com/image.png)
+
+**太字**、*斜体*、~~取り消し線~~、そして水平線:
+
+---
+
+| 見出し1 | 見出し2 |
+|---|---|
+| セル | {東京\|とうきょう} |
+
+## MDI 拡張 / MDI Extensions
+
+### 1. ルビ「Ruby」
+
+私は{雪女|ゆき.おんな}を見た。
+{東京|とうきょう}は雨だった。
+{彼女|かのじょ}は{微笑|ほほえ}んだ。
+
+### 2. 縦中横「Tate-chu-yoko」
+
+第^12^話。令和^7^年。^ABC^の略語。^OK^。
+
+### 3. 傍点「Boten」
+
+彼は[[em:それ]]を見た。
+[[em:●:決して]]忘れない。
+彼は《《それ》》を見た。
+
+### 4. 改行抑止「No-break」
+
+[[no-break:東京都新宿区]]に住んでいます。
+事件名は[[no-break:被愛妄想罪]]です。
+
+### 5. 改行マーカー「Explicit Line Break」と換段「Paragraph Break」
+
+春は曙。[[br]]
+やうやう白くなりゆく山ぎは、少し明かりて、紫だちたる雲の細くたなびきたる。
+
+夏は夜。月のころはさらなり。
+
+### 6. 空白段落「Blank Paragraph」
+
+春は曙。
+
+\
+\
+\
+
+夏は夜。
+
+### 7. 割注「Warichu」
+
+その日は大安[[warichu:六曜の一つで吉日とされる]]であった。
+
+### 8. 字間調整「Kerning」
+
+彼は[[kern:-0.1em:確実]]にそう言った。
+[[kern:+0.3em:沈黙]]が落ちた。
+[[kern:0em:通常]]の字間。
+
+### 9. 字下げ・地付き「Block Alignment」
+
+[[indent:2]]
+我輩は猫である。名前はまだ無い。
+
+[[bottom]]
+著者識
+
+[[bottom:2]]
+令和七年七月
+
+### 10. 改ページ「Page Break」
+
+第一章はここで終わる。
+
+[[pagebreak]]
+
+第二章が始まる。
+
+[[pagebreak:right]]
+
+第三章、改丁で右ページから開始。
+
+### 11. 脚注「Footnotes」(GFM 継承)
+
+彼はその話を信じなかった[^1]。
+
+[^1]: 後に事実と判明する。
+
+### 12. インラインの入れ子「Inline Nesting」
+
+[[em:{東京|とうきょう}]] のように、傍点がルビを包むこともできます。
+
+### 13. エスケープ「Escapes」
+
+\{これはリテラルの中括弧\}、\|パイプ\|、\^キャレット\^、\[角括弧\]、コロン\:、\《書名号\》。
+
+## Edge Cases（パーサ実装のテスト用)
+
+- 縦中横の文字種制限: `(^_^)` は縦中横にならず `^` はリテラルのまま。
+- 無効な字間調整量: `[[kern:abc:text]]` はマクロ全体がリテラル文字列になる。
+- 分割ルビの文字数不一致: `{東京|.きょう}` はグループルビにフォールバックする。
+- 無効な字下げ量: `[[indent:0]]` はリテラル文字列になる。
+- テーブルセル内のルビ: 上の表の `{東京\|とうきょう}` を参照。
