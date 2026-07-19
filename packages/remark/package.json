@@ -21,14 +21,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@types/mdast": "^4.0.0",
     "mdast-util-mdi": "workspace:*",
     "micromark-extension-mdi": "workspace:*",
     "remark-frontmatter": "^5.0.0",
     "remark-gfm": "^4.0.0",
     "remark-parse": "^11.0.0",
-    "unified": "^11.0.0"
+    "unified": "^11.0.0",
+    "yaml": "^2.0.0"
   },
   "devDependencies": {
+    "remark-stringify": "^11.0.0",
     "tsup": "^8.3.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"

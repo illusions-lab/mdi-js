@@ -101,6 +101,9 @@ importers:
 
   packages/remark:
     dependencies:
+      '@types/mdast':
+        specifier: ^4.0.0
+        version: 4.0.4
       mdast-util-mdi:
         specifier: workspace:*
         version: link:../mdast-util-mdi
@@ -119,7 +122,13 @@ importers:
       unified:
         specifier: ^11.0.0
         version: 11.0.5
+      yaml:
+        specifier: ^2.0.0
+        version: 2.9.0
     devDependencies:
+      remark-stringify:
+        specifier: ^11.0.0
+        version: 11.0.0
       tsup:
         specifier: ^8.3.0
         version: 8.5.1(postcss@8.5.19)(typescript@5.9.3)
@@ -1489,6 +1498,9 @@ packages:
 
   remark-stringify@11.0.0:
     resolution: {integrity: sha512-1OSmLd3awB/t8qdoEOMazZkNsfVTeY4fTsgzcQFdXNq8ToTN4ZGwrMnlda4K6smTFKD+GRV6O48i6Z4iKgPPpw==}
+
+  yaml@2.9.0:
+    resolution: {integrity: sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==}
 
   resolve-from@5.0.0:
     resolution: {integrity: sha512-qYg9KP24dD5qka9J47d0aVky0N+b4fTU89LN9iDnjB5waksiC49rvMB0PrUJQGoTmH50XPiqOvAjDfaijGxYZw==}
@@ -3130,6 +3142,8 @@ snapshots:
       '@types/mdast': 4.0.4
       mdast-util-to-markdown: 2.1.2
       unified: 11.0.5
+
+  yaml@2.9.0: {}
 
   resolve-from@5.0.0: {}
 
