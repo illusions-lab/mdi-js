@@ -35,17 +35,23 @@ HTML・PDF・EPUB の 3 つは HTML 系フォーマットであり、同じ mdas
 
 ## Architecture / アーキテクチャ
 
-```
-micromark-extension-mdi ─▶ mdast-util-mdi ─▶ @illusions-lab/mdi-remark
-                                  │
-                                  ▼
-                            @illusions-lab/mdi-to-hast
-                             /    │    \
-                            /     │     \
-                  @illusions-lab/mdi-to-html    │   @illusions-lab/mdi-to-epub
-                       │          │
-                  @illusions-lab/mdi-to-pdf     ▼
-                              @illusions-lab/mdi-to-docx  (reads mdast directly)
+```mermaid
+flowchart TD
+  micromark["micromark-extension-mdi"] --> mdastUtil["mdast-util-mdi"]
+  mdastUtil --> remark["@illusions-lab/mdi-remark"]
+
+  remark -->|MDI mdast tree| hast["@illusions-lab/mdi-to-hast"]
+  hast --> html["@illusions-lab/mdi-to-html"]
+  html --> pdf["@illusions-lab/mdi-to-pdf"]
+  hast --> epub["@illusions-lab/mdi-to-epub"]
+  remark -->|MDI mdast tree| docx["@illusions-lab/mdi-to-docx"]
+
+  classDef parser fill:#e8f0fe,stroke:#4285f4,color:#202124
+  classDef transform fill:#e6f4ea,stroke:#34a853,color:#202124
+  classDef converter fill:#fef7e0,stroke:#f9ab00,color:#202124
+  class micromark,mdastUtil,remark parser
+  class hast transform
+  class html,pdf,epub,docx converter
 ```
 
 All converters consume the **same mdast tree** produced by `@illusions-lab/mdi-remark`, so editor-path and export-path behavior stay in sync (see [SYNTAX.md § Parsing Order](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md#parsing-order--パース順序)).
