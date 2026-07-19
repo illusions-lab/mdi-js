@@ -31,4 +31,13 @@ describe("mdiConstructs", () => {
 			expect.arrayContaining([codes.backslash, codes.lessThan, codes.leftSquareBracket]),
 		);
 	});
+
+	it("keeps inline delimiter families distinct from block-only macro syntax", () => {
+		for (const name of ["ruby", "tcy", "botenAlias", "bracketMacro"] as const) {
+			expect(mdiConstructs[name].contentType).toBe("text");
+		}
+		for (const name of ["blank", "blockMacro"] as const) {
+			expect(mdiConstructs[name].contentType).toBe("flow");
+		}
+	});
 });

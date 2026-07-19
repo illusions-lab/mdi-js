@@ -17,8 +17,8 @@ describe("unescapeMdi", () => {
 		expect(unescapeMdi(input)).toBe(expected);
 	});
 
-	it("leaves a backslash before a non-escapable character alone", () => {
-		expect(unescapeMdi(String.raw`\n`)).toBe(String.raw`\n`);
+	it.each([String.raw`\n`, String.raw`\a`, String.raw`\0`, String.raw`\-`])("leaves a backslash before non-escapable %s alone", (value) => {
+		expect(unescapeMdi(value)).toBe(value);
 	});
 
 	it("unescapes multiple occurrences in one string", () => {

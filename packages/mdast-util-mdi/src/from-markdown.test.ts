@@ -60,6 +60,16 @@ describe("mdiRuby", () => {
 		expect(node.ruby).toBe("きょう");
 	});
 
+	it.each(["{東京|.とうきょう}", "{東京|とうきょう.}"])("falls back to group ruby for an empty edge segment in %s", (value) => {
+		const node = firstParagraphChildren(parse(value))[0] as MdiRuby;
+		expect(node.ruby).toBe("とうきょう");
+	});
+
+	it("keeps a dot-less single-base ruby grouped and rejects its empty split segment", () => {
+		expect((firstParagraphChildren(parse("{京|きょう}"))[0] as MdiRuby).ruby).toBe("きょう");
+		expect((firstParagraphChildren(parse("{京|きょう.}"))[0] as MdiRuby).ruby).toBe("きょう");
+	});
+
 	it("falls back to group ruby when segment count doesn't match base length", () => {
 		const children = firstParagraphChildren(parse("{東京|と.う.きょう}"));
 		const node = children[0] as MdiRuby;
@@ -71,6 +81,32 @@ describe("mdiRuby", () => {
 		const node = children[0] as MdiRuby;
 		expect(node.base).toBe("東|京");
 		expect(node.ruby).toBe("とうきょう");
+	});
+
+	it("unescapes every ruby delimiter without treating it as syntax", () => {
+		const node = firstParagraphChildren(parse(String.raw`{a\{b\}c\|d|r\.u\{b\}c\|d}`))[0] as MdiRuby;
+		expect(withoutPosition(node)).toEqual({ type: "mdiRuby", base: "a{b}c|d", ruby: "r.u{b}c|d" });
+	});
+
+	it("requires a real closing brace after an escaped closing brace", () => {
+		const node = firstParagraphChildren(parse(String.raw`{base|ruby\}}`))[0] as MdiRuby;
+		expect(withoutPosition(node)).toEqual({ type: "mdiRuby", base: "base", ruby: "ruby}" });
+	});
+
+	it("parses adjacent ruby nodes independently", () => {
+		const children = firstParagraphChildren(parse("{a|b}{c|d}"));
+		expect(withoutPosition(children)).toEqual([
+			{ type: "mdiRuby", base: "a", ruby: "b" },
+			{ type: "mdiRuby", base: "c", ruby: "d" },
+		]);
+	});
+
+	it("treats a literal { inside base as ordinary content, not a nested attempt", () => {
+		// Base scanning never recurses (SYNTAX.md "Inline Nesting": ruby content
+		// is plain text) - the first `{` owns everything up to the next `|`/`}`,
+		// so a second `{` along the way is just part of the base text.
+		const children = firstParagraphChildren(parse("{a{b|c}"));
+		expect(withoutPosition(children)).toEqual([{ type: "mdiRuby", base: "a{b", ruby: "c" }]);
 	});
 
 	it("treats an unclosed ruby as literal text", () => {
@@ -120,6 +156,25 @@ describe("mdiTcy", () => {
 		const children = firstParagraphChildren(parse("^1234567^"));
 		expect(children).toHaveLength(1);
 		expect((children[0] as Text).value).toBe("^1234567^");
+	});
+
+	it("accepts exactly six tate-chu-yoko characters", () => {
+		const node = firstParagraphChildren(parse("^123456^"))[0] as MdiTcy;
+		expect(withoutPosition(node)).toEqual({ type: "mdiTcy", value: "123456" });
+	});
+
+	it("parses adjacent tate-chu-yoko nodes without consuming either boundary", () => {
+		expect(withoutPosition(firstParagraphChildren(parse("^12^^34^")))).toEqual([
+			{ type: "mdiTcy", value: "12" },
+			{ type: "mdiTcy", value: "34" },
+		]);
+	});
+
+	it("leaves unrelated carets literal while parsing a valid pair in the same paragraph", () => {
+		expect(withoutPosition(firstParagraphChildren(parse("x ^_^ and ^OK^")))).toEqual([
+			{ type: "text", value: "x ^_^ and " },
+			{ type: "mdiTcy", value: "OK" },
+		]);
 	});
 
 	it("treats empty tate-chu-yoko as literal text", () => {
@@ -235,10 +290,77 @@ describe("mdiBracketMacro", () => {
 		const node = firstParagraphChildren(parse(String.raw`[[em:foo\]bar]]`))[0] as MdiEm;
 		expect(withoutPosition(node.children)).toEqual([{ type: "text", value: "foo]bar" }]);
 	});
+
+	it.each([
+		["[[em:\\{\\}\\|\\^\\[\\]\\:\\《\\》]]", "mdiEm"],
+		["[[no-break:\\{\\}\\|\\^\\[\\]\\:\\《\\》]]", "mdiNoBreak"],
+		["[[warichu:\\{\\}\\|\\^\\[\\]\\:\\《\\》]]", "mdiWarichu"],
+		["[[kern:0em:\\{\\}\\|\\^\\[\\]\\:\\《\\》]]", "mdiKern"],
+	])("unescapes every MDI delimiter in %s content", (value, type) => {
+		const node = firstParagraphChildren(parse(value))[0] as MdiEm | MdiNoBreak | MdiWarichu | MdiKern;
+		expect(node.type).toBe(type);
+		expect(withoutPosition(node.children)).toEqual([{ type: "text", value: "{}|^[]:《》" }]);
+	});
+
+	it("accepts a ZWJ sequence as a one-grapheme em mark", () => {
+		const node = firstParagraphChildren(parse("[[em:👨‍👩‍👧:family]]"))[0] as MdiEm;
+		expect(withoutPosition(node)).toEqual({ type: "mdiEm", mark: "👨‍👩‍👧", children: [{ type: "text", value: "family" }] });
+	});
+
+	it("parses nested em and adjacent inline macros", () => {
+		const children = firstParagraphChildren(parse("[[em:[[em:x]]]][[no-break:y]]"));
+		expect(withoutPosition(children)).toEqual([
+			{ type: "mdiEm", mark: "﹅", children: [{ type: "mdiEm", mark: "﹅", children: [{ type: "text", value: "x" }] }] },
+			{ type: "mdiNoBreak", children: [{ type: "text", value: "y" }] },
+		]);
+	});
+
+	it("balances bracket macros across four nesting levels and ignores escaped brackets", () => {
+		const node = firstParagraphChildren(parse(String.raw`[[em:a\[[[no-break:b\][[warichu:c[[kern:0em:d]]e]]f]]g]]`))[0] as MdiEm;
+		expect(withoutPosition(node.children)).toEqual([
+			{ type: "text", value: "a[" },
+			{ type: "mdiNoBreak", children: [
+				{ type: "text", value: "b]" },
+				{ type: "mdiWarichu", children: [
+					{ type: "text", value: "c" },
+					{ type: "mdiKern", amount: "0em", children: [{ type: "text", value: "d" }] },
+					{ type: "text", value: "e" },
+				] },
+				{ type: "text", value: "f" },
+			] },
+			{ type: "text", value: "g" },
+		]);
+	});
+
+	it("parses br wherever bracket-macro content permits inline MDI", () => {
+		const children = firstParagraphChildren(parse("[[br]][[br]][[br]][[no-break:a[[br]]b]][[warichu:a[[br]]b]][[em:a[[br]]b]]"));
+		expect(children.slice(0, 3).map((node) => node.type)).toEqual(["mdiBreak", "mdiBreak", "mdiBreak"]);
+		for (const node of children.slice(3) as Array<MdiNoBreak | MdiWarichu | MdiEm>) {
+			expect(node.children.map((child) => child.type)).toEqual(["text", "mdiBreak", "text"]);
+		}
+	});
+
+	it("parses br at both paragraph boundaries", () => {
+		const children = firstParagraphChildren(parse("[[br]]middle[[br]]"));
+		expect(children.map((node) => node.type)).toEqual(["mdiBreak", "text", "mdiBreak"]);
+	});
+
+	it.each([
+		["[[kern:0em:text]]", "0em"],
+		["[[kern:+0em:text]]", "+0em"],
+		["[[kern:-0em:text]]", "-0em"],
+	])("accepts the valid kern amount in %s", (value, amount) => {
+		const node = firstParagraphChildren(parse(value))[0] as MdiKern;
+		expect(node.amount).toBe(amount);
+	});
+
+	it.each(["[[kern:.5em:text]]", "[[kern:1.5.5em:text]]", "[[kern:1em :text]]", "[[kern:1e2em:text]]"])("keeps invalid kern amount %s literal", (value) => {
+		expect(withoutPosition(firstParagraphChildren(parse(value))[0])).toEqual({ type: "text", value });
+	});
 });
 
 describe("mdiBlank", () => {
-	it.each(["\\", "\\  ", "<br>", "<br />", "[[blank]]"])("parses %s as a blank paragraph", (value) => {
+	it.each(["\\", "\\  ", "\\\t\t", "<br>", "<br />", "[[blank]]"])("parses %s as a blank paragraph", (value) => {
 		const tree = parse(value);
 		expect(tree.children).toHaveLength(1);
 		expect(withoutPosition(tree.children[0] as MdiBlank)).toEqual({ type: "mdiBlank" });
@@ -259,6 +381,23 @@ describe("mdiBlank", () => {
 				{ type: "paragraph", children: [{ type: "text", value: "夏は夜。" }] },
 			],
 		});
+	});
+
+	it("recognizes blank markers inside blockquotes and list items", () => {
+		// Container continuation reuses the same flow tokenizing recursively,
+		// so there's no reason a block-boundary construct like this should
+		// behave differently nested inside a blockquote/list than at top level.
+		const tree = parse("> \\\n\n- [[blank]]");
+		expect(withoutPosition(tree.children)).toEqual([
+			{ type: "blockquote", children: [{ type: "mdiBlank" }] },
+			{
+				type: "list",
+				ordered: false,
+				start: null,
+				spread: false,
+				children: [{ type: "listItem", spread: false, checked: null, children: [{ type: "mdiBlank" }] }],
+			},
+		]);
 	});
 
 	it.each(["\\ hello", "hello\\"])("leaves non-standalone markers as text", (value) => {
@@ -305,6 +444,24 @@ describe("mdiBlockMacro", () => {
 		expect((tree.children[0] as Paragraph).children).toEqual([{ type: "text", value: "[[indent:2]]" }]);
 		expect((tree.children[1] as Paragraph).children).toEqual([{ type: "text", value: "[[bottom]]" }]);
 		expect((tree.children[2] as Paragraph).data).toBeUndefined();
+	});
+
+	it("accepts an unbounded positive indent and rejects leading zeroes", () => {
+		const indented = parse("[[indent:99999999]]\nparagraph");
+		expect((indented.children[0] as Paragraph).data?.mdiIndent).toBe(99999999);
+		const literal = parse("[[indent:007]]\nparagraph");
+		expect((literal.children[0] as Paragraph).children).toEqual([{ type: "text", value: "[[indent:007]]" }]);
+	});
+
+	it("keeps three stacked block macros literal", () => {
+		const tree = parse("[[indent:2]]\n[[bottom]]\n[[bottom:2]]\nparagraph");
+		expect(tree.children.map((node) => node.type)).toEqual(["paragraph", "paragraph", "paragraph", "paragraph"]);
+		expect((tree.children[3] as Paragraph).data).toBeUndefined();
+	});
+
+	it.each(["[[pagebreak:up]]", "[[pagebreak:RIGHT]]"])("keeps invalid pagebreak variant %s literal", (value) => {
+		const tree = parse(value);
+		expect((tree.children[0] as Paragraph).children).toEqual([{ type: "text", value }]);
 	});
 
 	it("keeps a trailing block macro literal", () => {

@@ -4,6 +4,7 @@ import { botenAlias } from "./syntax/boten-alias.js";
 import { blank } from "./syntax/blank.js";
 import { blockMacro } from "./syntax/block-macro.js";
 import { bracketMacro, bracketMacroClose } from "./syntax/bracket-macro.js";
+import { cjkEscape } from "./syntax/cjk-escape.js";
 import { ruby } from "./syntax/ruby.js";
 import { tcy } from "./syntax/tcy.js";
 import { mdiConstructs } from "./types.js";
@@ -22,6 +23,7 @@ export function mdi(): Extension {
 			[codes.rightSquareBracket]: bracketMacroClose,
 			[mdiConstructs.tcy.triggers[0]!]: tcy,
 			[mdiConstructs.botenAlias.triggers[0]!]: botenAlias,
+			[codes.backslash]: cjkEscape,
 		},
 		flow: {
 			[mdiConstructs.blank.triggers[0]!]: blank,

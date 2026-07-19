@@ -80,7 +80,16 @@ function tokenizeOpen(this: TokenizeContext, effects: Effects, ok: State, nok: S
 		effects.consume(code);
 		effects.exit("mdiBracketMacroMarker");
 		effects.exit("mdiBracketMacro");
+		// Mark balanced but immediately drop the bracket-macro marker itself:
+		// unlike the other macros (whose open token gets spliced away by
+		// resolveTo once THEY close), br's fast self-contained close never
+		// goes through resolveTo, so its token would otherwise sit in the
+		// event stream forever still flagged `_mdiBracketMacro && _mdiBalanced`
+		// - a false-positive match for a *later* macro's resolveTo/findOpen
+		// scan, which only look at those two flags to find "the nearest
+		// still-relevant bracket-macro token".
 		macro._mdiBalanced = true;
+		macro._mdiBracketMacro = undefined;
 		return ok;
 	}
 
@@ -131,7 +140,13 @@ function resolveTo(events: Event[], context: TokenizeContext): Event[] {
 	let closeIndex = events.length;
 	while (closeIndex-- && !(events[closeIndex]![1] as MacroToken)._mdiClose) {}
 	const close = events[closeIndex]![1] as MacroToken;
-	const openIndex = events.findIndex((event) => event[0] === "enter" && (event[1] as MacroToken)._mdiBracketMacro && (event[1] as MacroToken)._mdiBalanced);
+	// Nearest preceding balanced open, not the first one anywhere: once any
+	// earlier bracket macro in the same paragraph has already closed (e.g. a
+	// standalone [[br]]), its token is also `_mdiBracketMacro && _mdiBalanced`,
+	// so a forward findIndex would wrongly pair this close with that unrelated,
+	// already-resolved macro instead of the one it actually belongs to.
+	let openIndex = closeIndex;
+	while (openIndex-- && !(events[openIndex]![0] === "enter" && (events[openIndex]![1] as MacroToken)._mdiBracketMacro && (events[openIndex]![1] as MacroToken)._mdiBalanced)) {}
 	const open = events[openIndex]![1] as MacroToken;
 	const headerEnd = events.findIndex((event, index) => index > openIndex && event[0] === "exit" && event[1] === open);
 	const group: Token = { type: "mdiBracketMacro", start: { ...open.start }, end: { ...close.end } };
