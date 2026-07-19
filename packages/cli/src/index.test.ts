@@ -139,4 +139,25 @@ describe("CLI command output", () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+
+  it("writes DOCX without emitting a Node web-storage warning", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mdi-cli-docx-command-"));
+    try {
+      const input = join(directory, "book.mdi");
+      const output = join(directory, "book.docx");
+      await writeFile(input, "# Book");
+      const { stdout, stderr } = await run(process.execPath, [
+        resolve("dist/cli.js"),
+        "build",
+        input,
+        "--to",
+        "docx",
+      ]);
+      expect(stderr).toBe("");
+      expect(stdout).toBe(`Written ${output}\n`);
+      expect((await readFile(output)).subarray(0, 2).toString()).toBe("PK");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
 });
