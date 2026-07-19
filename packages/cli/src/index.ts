@@ -50,9 +50,7 @@ export async function build(
           cover: await loadCover(resolvedOptions.profile),
         })
       : format === "docx"
-      ? await (
-          await import("@illusions-lab/mdi-to-docx")
-        ).mdiToDocx(tree, resolvedOptions.profile)
+      ? await exportDocx(tree, resolvedOptions.profile)
       : mdiToText(tree, resolvedOptions.profile, format === "txt-ruby");
   const extension = format === "txt-ruby" ? "txt" : format;
   const destination =
@@ -138,6 +136,23 @@ async function loadCover(
     data: await readFile(coverPath),
     mediaType: extension === ".png" ? "image/png" : "image/jpeg",
   };
+}
+
+/**
+ * Node 25+ exposes `localStorage` behind an experimental getter. `docx` checks
+ * that global while loading an optional browser polyfill, which otherwise emits
+ * a warning for every CLI conversion. The CLI does not use web storage.
+ */
+async function exportDocx(
+  tree: Root,
+  profile?: ExportProfile
+): Promise<Buffer> {
+  Object.defineProperty(globalThis, "localStorage", {
+    value: undefined,
+    configurable: true,
+    writable: true,
+  });
+  return (await import("@illusions-lab/mdi-to-docx")).mdiToDocx(tree, profile);
 }
 
 function textBlock(
