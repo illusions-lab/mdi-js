@@ -64,10 +64,7 @@ export async function mdiToEpub(
       xhtml(
         chapter.title || title,
         lang,
-        toHtml(
-          { type: "root", children: chapter.children },
-          { closeSelfClosing: true, tightSelfClosing: true }
-        )
+        xhtmlBody(chapter.children)
       )
     )
   );
@@ -198,6 +195,34 @@ function xhtml(title: string, lang: string, body: string): string {
     title
   )}</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body>${body}</body></html>`;
 }
+
+/**
+ * `hast-util-to-html` deliberately emits HTML's compact boolean-attribute
+ * notation (for example, `data-footnote-ref`).  EPUB content documents are
+ * XHTML, where every attribute needs an explicit value.  Normalise these in
+ * the HAST tree before serialization so ordinary attribute values, including
+ * aria-label values containing spaces, remain intact.
+ */
+function xhtmlBody(children: HastRootContent[]): string {
+  normalizeXhtmlDataAttributes(children);
+  return toHtml(
+    { type: "root", children },
+    { closeSelfClosing: true, tightSelfClosing: true }
+  );
+}
+
+function normalizeXhtmlDataAttributes(nodes: HastRootContent[]): void {
+  for (const node of nodes) {
+    if (node.type !== "element") continue;
+    for (const [name, value] of Object.entries(node.properties ?? {})) {
+      if (name.startsWith("data") && value === true) {
+        node.properties![name] = "";
+      }
+    }
+    normalizeXhtmlDataAttributes(node.children);
+  }
+}
+
 function xml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
