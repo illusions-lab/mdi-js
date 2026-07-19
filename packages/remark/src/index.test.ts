@@ -76,6 +76,56 @@ title: Example
 		);
 	});
 
+	it("supports GFM autolinks and task list items", () => {
+		const tree = parse("https://example.com\n\n- [ ] todo\n- [x] done");
+		const types = nodeTypes(tree);
+		const list = tree.children[1] as { type: string; children: Array<{ checked?: boolean }> };
+
+		expect(types).toContain("link");
+		expect(list.children.map((item) => item.checked)).toEqual([false, true]);
+	});
+
+	it("falls back to defaults for malformed YAML and treats TOML fences as content", () => {
+		expect(parse("---\ntitle: [unterminated\n---\ntext").data?.frontmatter).toMatchObject({
+			mdi: "2.0", lang: "ja", writingMode: "horizontal", pageProgression: "ltr",
+		});
+		const toml = parse("+++\ntitle = 'Not YAML front matter'\n+++\n\ntext");
+		expect(toml.data?.frontmatter?.title).toBeUndefined();
+		expect(nodeTypes(toml)).not.toContain("yaml");
+		expect(toml.children.some((node) => node.type === "paragraph")).toBe(true);
+	});
+
+	it("preserves declared MDI versions without refusing newer documents", () => {
+		for (const mdi of ["1.0", "3.0"]) {
+			expect(parse(`---\nmdi: "${mdi}"\n---\n{東京|とうきょう}`).data?.frontmatter?.mdi).toBe(mdi);
+		}
+	});
+
+	it("parses MDI inline syntax inside list items and blockquotes", () => {
+		const tree = parse("- {雪女|ゆき.おんな}\n\n> [[em:大事]]");
+		const types = nodeTypes(tree);
+
+		expect(types).toContain("mdiRuby");
+		expect(types).toContain("mdiEm");
+	});
+
+	it("does not yet parse ruby's escaped-pipe separator inside a GFM table cell", () => {
+		// SYNTAX.md §2 documents `{東京\|とうきょう}` in a table cell as producing
+		// normal ruby ("table parsing... unescapes \| before MDI inline
+		// parsing"), but mdast-util-gfm-table's `\|` unescaping is a post-hoc
+		// string replace on the already-built text node's value, not something
+		// that happens before micromark tokenizes the cell - so ruby's own
+		// tokenizer (which does its own raw character scan) never sees a bare
+		// `|` to recognize as its separator. This is a real, currently
+		// unresolved gap between the spec and how the underlying GFM table
+		// packages work, not an intentional design choice.
+		const tree = parse("| Word |\n| --- |\n| {東京\\|とうきょう} |");
+		const types = nodeTypes(tree);
+
+		expect(types).not.toContain("mdiRuby");
+		expect(types).toContain("text");
+	});
+
 	it("round-trips through the full remark processor", () => {
 		const source = `---
 writing-mode: vertical

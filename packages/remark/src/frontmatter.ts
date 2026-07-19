@@ -19,7 +19,7 @@ declare module "mdast" {
 
 export function resolveFrontmatter(tree: Root): void {
 	const yaml = tree.children[0];
-	const value = yaml?.type === "yaml" ? parse(yaml.value) : undefined;
+	const value = yaml?.type === "yaml" ? parseYaml(yaml.value) : undefined;
 	const source = isRecord(value) ? value : {};
 	const writingMode =
 		source["writing-mode"] === "vertical" ? "vertical" : "horizontal";
@@ -40,6 +40,15 @@ export function resolveFrontmatter(tree: Root): void {
 					? "rtl"
 					: "ltr",
 	};
+}
+
+/** Malformed front matter degrades to all-defaults rather than failing the whole parse. */
+function parseYaml(value: string): unknown {
+	try {
+		return parse(value);
+	} catch {
+		return undefined;
+	}
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

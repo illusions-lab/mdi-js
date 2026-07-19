@@ -12,3 +12,16 @@ describe("mdiToPdf", () => it("generates a browser-rendered PDF", async () => {
 	expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
 	expect(pdf.length).toBeGreaterThan(500);
 }, 30_000));
+
+describe("mdiToPdf edge cases", () => {
+	it("renders plain Markdown and can be called repeatedly", async () => {
+		const p = unified().use(remarkParse).use(remarkMdi);
+		const tree = p.runSync(p.parse("# Plain heading\n\nA regular paragraph.")) as Root;
+		const [first, second] = await Promise.all([mdiToPdf(tree), mdiToPdf(tree)]);
+
+		for (const pdf of [first, second]) {
+			expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+			expect(pdf.length).toBeGreaterThan(500);
+		}
+	}, 30_000);
+});

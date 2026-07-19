@@ -86,6 +86,36 @@ describe("mdiToHast", () => {
 		);
 	});
 
+	it("renders GFM footnotes with a reference and definition", () => {
+		const output = html("A note[^1].\n\n[^1]: note text");
+
+		expect(output).toContain("footnote-ref");
+		expect(output).toContain("footnote-backref");
+		expect(output).toContain("note text");
+	});
+
+	it("passes ordinary Markdown and GFM nodes through alongside MDI", () => {
+		const output = html(`# Heading\n\n- [x] item {東京|とうきょう}\n\n| A | B |\n| - | - |\n| [link](https://example.com) | ![alt](image.png) |\n\n\`\`\`ts\nconst value = ^12^;\n\`\`\``);
+
+		expect(output).toContain("<h1>Heading</h1>");
+		expect(output).toContain('<input type="checkbox" checked disabled>');
+		expect(output).toContain('<ruby class="mdi-ruby">東京');
+		expect(output).toContain("<table>");
+		expect(output).toContain('<a href="https://example.com">link</a>');
+		expect(output).toContain('<img src="image.png" alt="alt">');
+		expect(output).toContain("const value = ^12^;");
+	});
+
+	it("nests macros and retains GFM inline children in aligned paragraphs", () => {
+		const nested = html("[[em:[[no-break:[[warichu:{東京|とうきょう}]]]]]]");
+		expect(nested).toContain(
+			'<span class="mdi-em" style="--mdi-em:&#x22;﹅&#x22;;"><span class="mdi-nobr"><span class="mdi-warichu"><ruby class="mdi-ruby">東京',
+		);
+		expect(html("[[indent:2]]\n[link](https://example.com) and ~~old~~ {東京|とうきょう}")).toBe(
+			'<p class="mdi-indent" style="--mdi-indent:2;"><a href="https://example.com">link</a> and <del>old</del> <ruby class="mdi-ruby">東京<rp>（</rp><rt>とうきょう</rt><rp>）</rp></ruby></p>',
+		);
+	});
+
 	it("renders paragraph alignment without changing plain paragraphs", () => {
 		expect(html("[[indent:2]]\n我輩は猫である。名前はまだ無い。")).toBe(
 			'<p class="mdi-indent" style="--mdi-indent:2;">我輩は猫である。名前はまだ無い。</p>',
