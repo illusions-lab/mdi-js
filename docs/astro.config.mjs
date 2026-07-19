@@ -28,6 +28,7 @@ const packages = [
 	'to-pdf',
 	'to-epub',
 	'to-docx',
+	'export-profile',
 	'cli',
 ];
 
@@ -88,6 +89,14 @@ export default defineConfig({
 							label: 'Architecture',
 							translations: { ja: 'アーキテクチャ', 'zh-TW': '架構' },
 							slug: 'guides/architecture',
+						},
+						{
+							label: 'Export Profiles',
+							translations: {
+								ja: 'エクスポート・プロファイル',
+								'zh-TW': '匯出設定檔',
+							},
+							slug: 'guides/export-profiles',
 						},
 					],
 				},
