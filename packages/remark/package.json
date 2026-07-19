@@ -1,6 +1,6 @@
 {
   "name": "@illusions-lab/mdi-remark",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "remark plugin for MDI 2.0 (illusion Markdown): GFM + front matter + MDI extensions",
   "license": "MIT",
   "type": "module",
