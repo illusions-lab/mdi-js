@@ -1,6 +1,6 @@
 {
   "name": "mdast-util-mdi",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "mdast extension for MDI 2.0 (illusion Markdown) nodes",
   "license": "MIT",
   "type": "module",
