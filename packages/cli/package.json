@@ -22,11 +22,15 @@
     "@illusions-lab/mdi-to-html": "workspace:*",
     "@illusions-lab/mdi-to-pdf": "workspace:*",
     "@illusions-lab/mdi-to-epub": "workspace:*",
-    "@illusions-lab/mdi-to-docx": "workspace:*"
+    "@illusions-lab/mdi-to-docx": "workspace:*",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.0",
+    "@types/mdast": "^4.0.0"
   },
   "devDependencies": {
     "tsup": "^8.3.0",
     "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "@types/node": "^20.0.0"
   }
 }
