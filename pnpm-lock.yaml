@@ -79,6 +79,9 @@ importers:
 
   packages/micromark-extension-mdi:
     dependencies:
+      micromark-util-character:
+        specifier: ^2.0.0
+        version: 2.1.1
       micromark-util-symbol:
         specifier: ^2.0.0
         version: 2.0.1

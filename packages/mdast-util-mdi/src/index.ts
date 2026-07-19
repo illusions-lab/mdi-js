@@ -12,3 +12,5 @@ export type {
 	MdiKern,
 	MdiPagebreak,
 } from "./types.js";
+
+export { mdiFromMarkdown } from "./from-markdown.js";

@@ -149,4 +149,21 @@ declare module "mdast" {
 		mdiBlank: MdiBlank;
 		mdiPagebreak: MdiPagebreak;
 	}
+
+	// `RootContentMap` is what `Nodes`/`RootContent` are actually built
+	// from (see @types/mdast) — it does NOT derive from
+	// `PhrasingContentMap`/`BlockContentMap` above, so every custom node
+	// needs to be registered here too, or `mdast-util-from-markdown`'s
+	// `this.enter()`/`this.stack` won't type-check against it.
+	interface RootContentMap {
+		mdiRuby: MdiRuby;
+		mdiTcy: MdiTcy;
+		mdiBreak: MdiBreak;
+		mdiEm: MdiEm;
+		mdiNoBreak: MdiNoBreak;
+		mdiWarichu: MdiWarichu;
+		mdiKern: MdiKern;
+		mdiBlank: MdiBlank;
+		mdiPagebreak: MdiPagebreak;
+	}
 }
