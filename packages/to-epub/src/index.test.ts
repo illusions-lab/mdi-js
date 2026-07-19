@@ -95,6 +95,18 @@ describe("mdiToEpub edge cases", () => {
     );
   });
 
+  it("writes XHTML-safe values for footnote data attributes", async () => {
+    const zip = await JSZip.loadAsync(
+      await mdiToEpub(parse("A note[^1].\n\n[^1]: note text"))
+    );
+    const chapter = await zip.file("OEBPS/chapter-1.xhtml")!.async("string");
+
+    expect(chapter).toContain('data-footnote-ref=""');
+    expect(chapter).toContain('data-footnotes=""');
+    expect(chapter).toContain('data-footnote-backref=""');
+    expect(chapter).not.toMatch(/\sdata-footnote-ref(?=\s|>)/);
+  });
+
   it("writes cover, profile metadata, vertical progression, styles, and heading chapters", async () => {
     const zip = await JSZip.loadAsync(
       await mdiToEpub(parse("# One\n\ntext\n\n# Two\n\nmore"), {
