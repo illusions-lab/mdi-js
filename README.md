@@ -80,6 +80,10 @@ canonical grammar and its versioned specification remain in
 repository. Native Node and Python bindings will consume this same core in
 later releases.
 
+CI runs the Rust core natively on Linux, macOS, and Windows for both x64 and
+ARM64. The JavaScript integration suite (including Chromium PDF output) runs
+on Linux x64; platform-native bindings will use the same matrix when added.
+
 ### Versioning / バージョニング
 
 Every package's version is `<MDI spec version>.<package release number>` — the major.minor pair always equals the MDI spec version this repo targets (currently `2.0`), and the patch number is each package's own independent release count, **starting at `.1`** (never `.0`) for the first release under a given spec version. For example the first release under MDI 2.0 is `2.0.1`; a later fix to just `@illusions-lab/mdi-to-docx` might be `2.0.7` while `@illusions-lab/mdi-to-html` is still `2.0.3` — patch numbers are independent per package, only major.minor is shared.
