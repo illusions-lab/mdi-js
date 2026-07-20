@@ -1,3 +1,5 @@
+[MDI 2.0 specification](./SYNTAX.md) · [日本語 README](./README.ja.md)
+
 # MDI
 
 <p align="center">
@@ -39,7 +41,7 @@ The language toolkits below call this same parser instead of reimplementing the 
 | Swift | [`swift/`](./swift) | <a href="https://mdi.illusions.app/bindings/swift/"><img src="https://img.shields.io/badge/Swift%20docs-F05138?style=flat-square&logo=swift&logoColor=white" alt="Swift documentation" /></a> |
 | Android / Kotlin | [`android/`](./android) | <a href="https://mdi.illusions.app/bindings/android/"><img src="https://img.shields.io/badge/Android%20%2F%20Kotlin%20docs-3DDC84?style=flat-square&logo=android&logoColor=black" alt="Android and Kotlin documentation" /></a> |
 
-[MDI 2.0 specification](./SYNTAX.md) · [日本語 README](./README.ja.md)
+
 
 ## Repository layout
 
