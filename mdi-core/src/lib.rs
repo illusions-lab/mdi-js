@@ -5,19 +5,82 @@
 //! JavaScript).  Keeping that boundary here makes the grammar reusable from
 //! native bindings and WebAssembly without coupling it to one Markdown AST.
 
+use serde::{Serialize, Serializer, ser::SerializeStruct};
 use unicode_segmentation::UnicodeSegmentation;
 
 /// MDI syntax version implemented by this crate.
 pub const MDI_SPEC_VERSION: &str = "2.0";
 
+/// Version of the language-neutral wire format returned by the bindings.
+///
+/// `0.x` is intentional while the document model is expanded from the
+/// transitional MDI-only parser to the full CommonMark/GFM/MDI parser.
+pub const MDI_IR_VERSION: &str = "0.1";
+
+/// A binding-friendly parse envelope.
+///
+/// Capabilities make the current migration boundary explicit: consumers can
+/// use the Rust-owned MDI syntax tree today without mistaking it for the final
+/// whole-document CommonMark parser.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ParseOutput {
+    pub ir_version: &'static str,
+    pub syntax_version: &'static str,
+    pub capabilities: ParserCapabilities,
+    pub document: Document,
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+/// Parser features represented in a [`ParseOutput`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ParserCapabilities {
+    pub mdi: bool,
+    pub common_mark: bool,
+    pub gfm: bool,
+    pub front_matter: bool,
+    pub source_spans: bool,
+}
+
+/// A recoverable parser message. The transitional parser currently emits no
+/// diagnostics, but the field is part of the wire contract from stage 1.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Diagnostic {
+    pub severity: DiagnosticSeverity,
+    pub code: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub span: Option<SourceSpan>,
+}
+
+/// Severity of a parser diagnostic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DiagnosticSeverity {
+    Warning,
+    Error,
+}
+
+/// Half-open UTF-8 byte range in the original source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceSpan {
+    pub start_byte: u32,
+    pub end_byte: u32,
+}
+
 /// A document split into MDI-relevant block boundaries.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Document {
     pub blocks: Vec<Block>,
 }
 
 /// A block-level MDI construct or ordinary source line.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum Block {
     Paragraph {
         inlines: Vec<Inline>,
@@ -31,7 +94,8 @@ pub enum Block {
 }
 
 /// A page-break side.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum PagebreakVariant {
     Left,
     Right,
@@ -59,8 +123,73 @@ pub enum Inline {
     },
 }
 
+/// Keep the public wire nodes flat (`{ type, value }`, `{ type, children }`,
+/// and so on) without forcing the Rust implementation to use struct variants
+/// internally. This shape maps naturally to discriminated unions in every
+/// host language.
+impl Serialize for Inline {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Text(value) => {
+                let mut node = serializer.serialize_struct("Inline", 2)?;
+                node.serialize_field("type", "text")?;
+                node.serialize_field("value", value)?;
+                node.end()
+            }
+            Self::Ruby { base, ruby } => {
+                let mut node = serializer.serialize_struct("Inline", 3)?;
+                node.serialize_field("type", "ruby")?;
+                node.serialize_field("base", base)?;
+                node.serialize_field("ruby", ruby)?;
+                node.end()
+            }
+            Self::Tcy(value) => {
+                let mut node = serializer.serialize_struct("Inline", 2)?;
+                node.serialize_field("type", "tcy")?;
+                node.serialize_field("value", value)?;
+                node.end()
+            }
+            Self::Break => {
+                let mut node = serializer.serialize_struct("Inline", 1)?;
+                node.serialize_field("type", "break")?;
+                node.end()
+            }
+            Self::Em { mark, children } => {
+                let mut node = serializer.serialize_struct("Inline", 3)?;
+                node.serialize_field("type", "em")?;
+                node.serialize_field("mark", mark)?;
+                node.serialize_field("children", children)?;
+                node.end()
+            }
+            Self::NoBreak(children) => {
+                let mut node = serializer.serialize_struct("Inline", 2)?;
+                node.serialize_field("type", "noBreak")?;
+                node.serialize_field("children", children)?;
+                node.end()
+            }
+            Self::Warichu(children) => {
+                let mut node = serializer.serialize_struct("Inline", 2)?;
+                node.serialize_field("type", "warichu")?;
+                node.serialize_field("children", children)?;
+                node.end()
+            }
+            Self::Kern { amount, children } => {
+                let mut node = serializer.serialize_struct("Inline", 3)?;
+                node.serialize_field("type", "kern")?;
+                node.serialize_field("amount", amount)?;
+                node.serialize_field("children", children)?;
+                node.end()
+            }
+        }
+    }
+}
+
 /// The reading attached to a ruby base.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "type", content = "value", rename_all = "camelCase")]
 pub enum RubyReading {
     Group(String),
     Split(Vec<String>),
@@ -97,6 +226,34 @@ pub fn parse(source: &str) -> Document {
     }
     flush_pending(&mut blocks, &mut pending);
     Document { blocks }
+}
+
+/// Parse with the stage-1 Rust syntax parser and return the versioned wire
+/// envelope used by language bindings.
+pub fn parse_output(source: &str) -> ParseOutput {
+    ParseOutput {
+        ir_version: MDI_IR_VERSION,
+        syntax_version: MDI_SPEC_VERSION,
+        capabilities: ParserCapabilities {
+            mdi: true,
+            common_mark: false,
+            gfm: false,
+            front_matter: false,
+            source_spans: false,
+        },
+        document: parse(source),
+        diagnostics: Vec::new(),
+    }
+}
+
+/// Serialize [`parse_output`] for FFI boundaries.
+///
+/// JSON is the first portable contract because it behaves identically through
+/// WebAssembly, N-API, PyO3, and a C ABI. Native bindings may later provide
+/// zero-copy views without changing this wire representation.
+pub fn parse_json(source: &str) -> String {
+    serde_json::to_string(&parse_output(source))
+        .expect("serializing the MDI parse output cannot fail")
 }
 
 /// Parse MDI inline syntax while keeping all other text literal.
@@ -522,34 +679,42 @@ fn classify_block_macro(source: &str) -> BlockMacroClass {
         "[[bottom]]" => return BlockMacroClass::Bottom(0),
         _ => {}
     }
-    if let Some(inner) = value.strip_prefix("[[").and_then(|rest| rest.strip_suffix("]]")) {
-        if let Some((kind, amount)) = inner.split_once(':') {
-            let valid_amount =
-                !amount.is_empty() && !amount.starts_with('0') && amount.bytes().all(|b| b.is_ascii_digit());
-            if valid_amount {
-                if let Ok(amount) = amount.parse::<u32>() {
-                    match kind {
-                        "indent" => return BlockMacroClass::Indent(amount),
-                        "bottom" => return BlockMacroClass::Bottom(amount),
-                        _ => {}
-                    }
-                }
+    if let Some((kind, amount)) = value
+        .strip_prefix("[[")
+        .and_then(|rest| rest.strip_suffix("]]"))
+        .and_then(|inner| inner.split_once(':'))
+    {
+        let valid_amount = !amount.is_empty()
+            && !amount.starts_with('0')
+            && amount.bytes().all(|b| b.is_ascii_digit());
+        if valid_amount && let Ok(amount) = amount.parse::<u32>() {
+            match kind {
+                "indent" => return BlockMacroClass::Indent(amount),
+                "bottom" => return BlockMacroClass::Bottom(amount),
+                _ => {}
             }
         }
     }
     BlockMacroClass::Literal
 }
 
-/// wasm-bindgen bindings exposing the pure semantic-resolution functions
-/// consumed by `mdast-util-mdi`'s `fromMarkdown` handlers (ruby split/group
-/// resolution, block-macro classification, MDI escape stripping). The
-/// micromark-level tokenizers stay JS-only: they're interleaved
-/// character-by-character with CommonMark's own tokenizer, which isn't
-/// something this crate's line/span-oriented grammar models.
+/// wasm-bindgen bindings for the stage-1 JavaScript interface and the legacy
+/// semantic helpers still consumed by the differential-test pipeline.
 #[cfg(feature = "wasm")]
 mod wasm {
-    use super::{classify_block_macro, split_ruby, unescape_mdi, unescape_ruby, BlockMacroClass, PagebreakVariant, RubyReading};
+    use super::{
+        BlockMacroClass, PagebreakVariant, RubyReading, classify_block_macro, parse_json,
+        split_ruby, unescape_mdi, unescape_ruby,
+    };
     use wasm_bindgen::prelude::*;
+
+    /// Parse with Rust and return the versioned MDI IR as JSON.
+    ///
+    /// The JavaScript package parses this string and performs no syntax work.
+    #[wasm_bindgen(js_name = parseMdiSyntaxJson)]
+    pub fn wasm_parse_mdi_syntax_json(source: &str) -> String {
+        parse_json(source)
+    }
 
     #[wasm_bindgen(js_name = unescapeMdi)]
     pub fn wasm_unescape_mdi(value: &str) -> String {
@@ -786,5 +951,24 @@ mod tests {
                 ]
             }
         );
+    }
+
+    #[test]
+    fn serializes_the_versioned_binding_contract() {
+        let value: serde_json::Value =
+            serde_json::from_str(&parse_json("[[indent:2]]\n第^12^話\n[[pagebreak:right]]"))
+                .expect("parse output is valid JSON");
+
+        assert_eq!(value["irVersion"], "0.1");
+        assert_eq!(value["syntaxVersion"], "2.0");
+        assert_eq!(value["capabilities"]["mdi"], true);
+        assert_eq!(value["capabilities"]["commonMark"], false);
+        assert_eq!(value["capabilities"]["sourceSpans"], false);
+        assert_eq!(value["diagnostics"], serde_json::json!([]));
+        assert_eq!(value["document"]["blocks"][0]["type"], "paragraph");
+        assert_eq!(value["document"]["blocks"][0]["indent"], 2);
+        assert_eq!(value["document"]["blocks"][0]["inlines"][1]["type"], "tcy");
+        assert_eq!(value["document"]["blocks"][1]["type"], "pagebreak");
+        assert_eq!(value["document"]["blocks"][1]["variant"], "right");
     }
 }

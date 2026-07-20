@@ -1,91 +1,79 @@
 ---
 title: アーキテクチャ
-description: MDI の 9 パッケージの関係と、パイプラインをこの位置で分割している理由。
+description: Rust を唯一の構文権威とし、各言語を薄いバインディングにする設計。
 ---
 
-## パッケージのレイヤー
+## 1 つのパーサ、複数言語のバインディング
 
-| パッケージ | レイヤー | 役割 |
-|---------|-------|------|
-| `micromark-extension-mdi` | パーサコア | CommonMark の上で MDI のインライン/ブロック構文をトークナイズ。 |
-| `mdast-util-mdi` | パーサコア | トークンイベントを mdast ノードへコンパイルし、markdown へ書き戻す。 |
-| `@illusions-lab/mdi-remark` | パーサコア | GFM + YAML フロントマター + MDI 拡張をまとめた単一 remark プラグイン。推奨エントリポイント。 |
-| `@illusions-lab/mdi-to-hast` | 共有変換 | 仕様の HTML マッピングに従い MDI mdast ノードを hast へ変換。ハンドラ表（`mdiHandlers`）とスタイルシートをエクスポート。 |
-| `@illusions-lab/mdi-to-html` | コンバータ | hast → スタイルシート込みの完全な HTML ドキュメント文字列。 |
-| `@illusions-lab/mdi-to-pdf` | コンバータ | HTML をヘッドレス Chromium で描画し PDF として出力。 |
-| `@illusions-lab/mdi-to-epub` | コンバータ | hast → EPUB 3（XHTML・OPF マニフェスト・nav。改ページで spine を分割）。 |
-| `@illusions-lab/mdi-to-docx` | コンバータ | mdast → ネイティブ OOXML。hast を完全にバイパス。 |
-| `@illusions-lab/mdi-cli` | CLI | `mdi build input.mdi --to html\|pdf\|epub\|docx` — コンバータの薄いラッパー。 |
+MDI は Rust を唯一の実行可能な構文権威とする構成へ移行しています。
+CommonMark、GFM、フロントマター、MDI 拡張を含む `.mdi` 文書全体を Rust
+で一度だけ解析し、バージョン付きの言語中立な文書 IR を生成します。
 
-## パイプライン
-
-```
-micromark-extension-mdi ─▶ mdast-util-mdi ─▶ @illusions-lab/mdi-remark
-                                  │
-                                  ▼  (単一の mdast ツリー)
-                        @illusions-lab/mdi-to-hast ────────┐
-                            │              │               │
-                            ▼              ▼               │
-                       mdi-to-html    mdi-to-epub          │
-                            │                              │
-                            ▼                              ▼
-                       mdi-to-pdf                    mdi-to-docx
-                                              (mdast を直接読む)
+```text
+.mdi ソース
+    ↓
+Rust parser → MDI document IR → Rust renderers
+    │                  │              ├─ HTML / TXT / EPUB / DOCX
+    │                  │              └─ HTML/CSS → Chromium → PDF
+    │                  └─ mdast compatibility adapter
+    └─ JavaScript / Python / Swift bindings
 ```
 
-すべてのコンバータは `@illusions-lab/mdi-remark` が生成する**同一の
-mdast ツリー**を消費するため、エディタ側とエクスポート側の挙動が
-分岐しません（仕様の
-[パース順序](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md#parsing-order--パース順序)
-を参照）。
+各言語のバインディングは文字列、バイト列、エラー、オブジェクト形状だけを
+変換し、構文を認識・検証しません。`kern` の妥当性や入れ子マクロの対応する
+閉じ位置などの規則は Rust にだけ実装します。
 
-## なぜこの位置で分割するのか
+## 文書全体を Rust で解析する理由
 
-**4 フォーマット中 3 つは HTML 系です。** HTML・PDF（ブラウザから印刷）・
-EPUB（XHTML の zip）は同じ mdast → hast マッピングを必要とするため、
-そのマッピングを `@illusions-lab/mdi-to-hast` に一度だけ実装し、3 つの
-コンバータは薄く保っています。
+MDI の境界は Markdown の文脈に依存します。
 
-**PDF は意図的に本物のブラウザを通します。** 日本語組版の機能 —
-`writing-mode: vertical-rl`、`text-combine-upright`（縦中横）、
-`text-emphasis`（傍点）— は、軽量な HTML→PDF ライブラリがまさに
-間違える CSS です。ヘッドレス Chromium は正しく描画するため、
-`mdi-to-pdf` はあえて「HTML を開いて印刷するだけ」です。
+```markdown
+`^12^`                 <!-- code 内ではリテラル -->
+**第^12^話**           <!-- strong 内の MDI -->
+[[em:**重要**]]        <!-- MDI 内の Markdown -->
+```
 
-**DOCX は HTML 系ではありません。** Word には同じ概念のネイティブ構造
-（`<w:ruby>`、`<w:eastAsianLayout w:combine="1"/>`、セクション単位の
-縦書き）があり、hast からのマッピングでは一度持っていた意味論を HTML
-から掘り起こし直すことになります。そのため `mdi-to-docx` は mdast
-ツリーを直接読みます。
+CommonMark の解析を各ホスト言語に任せると、MDI 境界の一部も各言語が決める
+ことになります。そのため、目標の Rust パーサは CommonMark/GFM と MDI を
+一緒に扱います。
 
-**パーサコアが 1 つでなく 3 パッケージなのは**、micromark/mdast
-エコシステムの慣例に従うためです: トークナイザと mdast ユーティリティは
-単体で任意の unified パイプラインに組み込めます（このドキュメント
-サイトはまさにその 2 つ + `mdiHandlers` だけを使い、コンバータを
-使っていません）。一方 `@illusions-lab/mdi-remark` はアプリケーション
-向けの全部入りプラグインです。
+## レンダラー
 
-## Rust 構文コアと JavaScript-first リリース
+HTML とテキスト出力は決定的なシリアライズなので Rust に置きます。EPUB も
+XHTML、CSS、メタデータ、ZIP の組み立てです。DOCX は Word 固有のルビ・縦書き
+互換性テストが必要なため、コア形式の安定後に移行します。
 
-MDI の正規の文法は、本リポジトリの
-[`SYNTAX.md`](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md)
-で管理します。`nodejs/` は既存の JavaScript 公開 API を維持します。
+PDF は意図的に実ブラウザを使います。Rust が HTML と印刷 CSS を生成し、
+Chromium を起動して `printToPDF` を呼び、PDF バイト列を返します。日本語の
+縦書き、縦中横、傍点、ルビ、フォント shaping、ページ分割は Chromium が
+担当し、Rust でブラウザのレイアウトエンジンを作り直しません。
 
-`mdi-core` は、エスケープ、書記素クラスタ対応のルビ、縦中横、傍点、
-入れ子にできるインラインマクロ、ブロックマクロを扱う、言語非依存の Rust
-実装です。CommonMark と GFM は意図的に解析せず、JavaScript アダプタ側の
-micromark/remark に残します。これにより既存の mdast API と JS 利用者の挙動を
-維持できます。
+## JavaScript API と remark 互換
 
-Rust コアを含む最初のリリースは JavaScript-first です。Cargo による検証を
-既存の JavaScript テストと同時に実行しますが、公開 API は現在の
-micromark/remark パイプラインのままです。Node、Python、WASM の native
-binding は、別のパーサではなくこの同じコアに追加するアダプタです。
+`@illusions-lab/mdi` が新しい薄い JavaScript バインディングです。第 1 段階の
+`parseMdiSyntax` は、Rust のバージョン付き IR と capability flags を返します。
+完全な CommonMark/GFM/MDI パーサが Rust に移るまで、汎用 `parse` API は公開
+しません。
+
+既存の micromark/remark パーサは差分テスト用の oracle として一時的に残します。
+長期的な第 2 実装ではありません。必要なら Rust IR から mdast への互換 adapter
+を提供しますが、そこに構文規則は置きません。
+
+## 移行順序
+
+1. バージョン付き IR 契約と型付き JavaScript binding。
+2. Rust による完全な CommonMark/GFM/MDI/front-matter parser。
+3. Rust の正規化、検証、修復、`.mdi` シリアライズ。
+4. Rust の TXT、HTML、EPUB renderer。
+5. Rust の DOCX renderer と Rust 制御の Chromium PDF パイプライン。
+6. 同じ API に対する Python、Swift binding。
+
+詳細はリポジトリの
+[`ARCHITECTURE.md`](https://github.com/illusions-lab/MDI/blob/main/ARCHITECTURE.md)
+を参照してください。
 
 ## バージョニング
 
-パッケージのバージョンは `<MDI 仕様バージョン>.<リリース回数>` です —
-major.minor は常に対応する MDI 仕様バージョン（現在 **2.0**）に一致し、
-patch は各パッケージ独自のリリースカウンタで `.1` から始まります。
-つまり `2.0.5` は「MDI 2.0 対応の 5 回目のリリース」を意味し、patch
-はパッケージ間で同期しません。
+パッケージのバージョンは `<MDI 仕様バージョン>.<リリース回数>` です。
+major.minor は対象の MDI 仕様、patch は各パッケージ独自の `.1` から始まる
+リリースカウンタです。

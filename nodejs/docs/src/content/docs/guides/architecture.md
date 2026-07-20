@@ -1,89 +1,91 @@
 ---
 title: Architecture
-description: How the nine MDI packages fit together, and why the pipeline splits where it does.
+description: Rust as the single syntax authority, thin language bindings, and shared renderers.
 ---
 
-## Package layers
+## One parser, many language bindings
 
-| Package | Layer | Role |
-|---------|-------|------|
-| `micromark-extension-mdi` | Parser core | Tokenizes MDI inline/block syntax on top of CommonMark. |
-| `mdast-util-mdi` | Parser core | Compiles the token events into mdast nodes, and serializes them back to markdown. |
-| `@illusions-lab/mdi-remark` | Parser core | One remark plugin bundling GFM + YAML front matter + the MDI extensions. The recommended entry point. |
-| `@illusions-lab/mdi-to-hast` | Shared transform | Maps MDI mdast nodes to hast per the spec's HTML mapping. Exports the handler table (`mdiHandlers`) and the stylesheet. |
-| `@illusions-lab/mdi-to-html` | Converter | hast → complete HTML document string, stylesheet inlined. |
-| `@illusions-lab/mdi-to-pdf` | Converter | Renders the HTML in headless Chromium and prints to PDF. |
-| `@illusions-lab/mdi-to-epub` | Converter | hast → EPUB 3 (XHTML, OPF manifest, nav; spine split on page breaks). |
-| `@illusions-lab/mdi-to-docx` | Converter | mdast → native OOXML, bypassing hast entirely. |
-| `@illusions-lab/mdi-cli` | CLI | `mdi build input.mdi --to html\|pdf\|epub\|docx` — thin wrapper over the converters. |
+MDI is moving to a Rust-authoritative architecture. The complete `.mdi`
+document — CommonMark, GFM, front matter, and MDI extensions — is parsed once
+in Rust into a versioned, language-neutral document IR.
 
-## The pipeline
-
-```
-micromark-extension-mdi ─▶ mdast-util-mdi ─▶ @illusions-lab/mdi-remark
-                                  │
-                                  ▼  (one mdast tree)
-                        @illusions-lab/mdi-to-hast ────────┐
-                            │              │               │
-                            ▼              ▼               │
-                       mdi-to-html    mdi-to-epub          │
-                            │                              │
-                            ▼                              ▼
-                       mdi-to-pdf                    mdi-to-docx
-                                                (reads mdast directly)
+```text
+.mdi source
+    ↓
+Rust parser → MDI document IR → Rust renderers
+    │                  │              ├─ HTML / text / EPUB / DOCX
+    │                  │              └─ HTML/CSS → Chromium → PDF
+    │                  └─ mdast compatibility adapter
+    └─ JavaScript / Python / Swift bindings
 ```
 
-Every converter consumes the **same mdast tree** produced by
-`@illusions-lab/mdi-remark`, so editor-path and export-path behavior stay in
-sync (see the spec's
-[Parsing Order](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md#parsing-order--パース順序)).
+JavaScript, Python, and Swift bindings convert strings, byte arrays, errors,
+and object shapes. They do not recognize or validate syntax. A rule such as a
+valid `kern` amount or the matching close of a nested bracket macro must exist
+in Rust only.
 
-## Why the split falls where it does
+The human-readable [`SYNTAX.md`](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md),
+the Rust reference parser, and shared conformance fixtures together define the
+contract.
 
-**Three of the four output formats are HTML-family.** HTML, PDF (printed from
-a browser), and EPUB (zipped XHTML) all want the same mdast → hast mapping, so
-that mapping lives once in `@illusions-lab/mdi-to-hast` and the three
-converters stay thin.
+## Why Rust parses the whole document
 
-**PDF goes through a real browser on purpose.** Japanese typography features —
-`writing-mode: vertical-rl`, `text-combine-upright` (tate-chu-yoko),
-`text-emphasis` (boten) — are exactly the CSS that lightweight HTML-to-PDF
-libraries get wrong. Headless Chromium renders them correctly, so
-`mdi-to-pdf` is deliberately just "open the HTML, print it."
+MDI boundaries depend on Markdown context:
 
-**DOCX is not HTML-family.** Word has native constructs for the same concepts
-(`<w:ruby>`, `<w:eastAsianLayout w:combine="1"/>`, section-level vertical text
-direction), and mapping hast onto those would mean un-flattening HTML back
-into semantics we already had. So `mdi-to-docx` reads the mdast tree directly.
+```markdown
+`^12^`                 <!-- literal inside code -->
+**第^12^話**           <!-- MDI inside strong text -->
+[[em:**重要**]]        <!-- Markdown inside an MDI construct -->
+```
 
-**The parser core is three packages, not one,** following the micromark/mdast
-ecosystem convention: the tokenizer and the mdast utility are usable on their
-own in any unified pipeline (this documentation site uses exactly those two
-plus `mdiHandlers` — no converter involved), while `@illusions-lab/mdi-remark`
-is the batteries-included plugin for applications.
+Leaving CommonMark parsing to every host language would make those languages,
+not Rust, responsible for part of the boundary decision. The target parser
+therefore owns CommonMark/GFM and MDI together.
 
-## Rust syntax core and the JavaScript-first release
+## Renderers
 
-The canonical MDI grammar lives in [`SYNTAX.md`](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md)
-in this repository. `nodejs/` keeps its existing JavaScript public API.
+HTML and text output are deterministic serialization and belong in Rust. EPUB
+is XHTML, CSS, metadata, and ZIP packaging, so it also shares the Rust IR and
+renderer code. DOCX moves after the core formats stabilize because Word's
+native ruby and vertical-writing behavior needs more integration testing.
 
-`mdi-core` is a language-neutral Rust implementation of the
-MDI-specific grammar: escapes, grapheme-aware ruby, tate-chu-yoko, boten,
-nestable inline macros, and MDI block macros. It intentionally does **not**
-parse CommonMark or GFM; those stay with micromark/remark in the JavaScript
-adapter. This preserves the established mdast API and means every existing JS
-consumer keeps its behavior.
+PDF uses a real browser deliberately. Rust generates HTML and print CSS,
+starts Chromium, invokes `printToPDF`, and returns the bytes. Chromium remains
+the layout engine for `vertical-rl`, tate-chu-yoko, text emphasis, ruby, font
+shaping, and pagination; MDI does not attempt to rebuild a browser layout
+engine in Rust.
 
-The first release containing the Rust core is JavaScript-first: the core is
-verified with Cargo alongside the existing JavaScript suite, while the
-published API remains the current micromark/remark pipeline. Native Node,
-Python, and WASM bindings are follow-up adapters over the same core, not new
-parsers with independent grammars.
+Browser WASM cannot start a local process, so browser clients use a backend or
+desktop host for PDF generation.
+
+## JavaScript API and remark compatibility
+
+`@illusions-lab/mdi` is the new thin JavaScript binding. Stage 1 exposes
+`parseMdiSyntax`, which returns an explicitly versioned Rust IR plus capability
+flags. The flags currently state that CommonMark/GFM/front matter and source
+spans are not integrated; the general `parse` API will be added only when Rust
+owns the complete document parser.
+
+The existing micromark/remark parser remains temporarily as a differential
+test oracle. It is not a second long-term implementation. If Astro or unified
+users need mdast after migration, a compatibility adapter will map the Rust IR
+to mdast without making syntax decisions.
+
+## Migration order
+
+1. Versioned IR contract and typed JavaScript binding.
+2. Full Rust CommonMark/GFM/MDI/front-matter parser and source spans.
+3. Rust normalization, validation, repair, and canonical `.mdi` serialization.
+4. Rust text, HTML, and EPUB renderers.
+5. Rust DOCX renderer and Rust-controlled Chromium PDF pipeline.
+6. Python and Swift bindings over the same APIs.
+
+See the repository's
+[`ARCHITECTURE.md`](https://github.com/illusions-lab/MDI/blob/main/ARCHITECTURE.md)
+for the complete ownership rules and current transition status.
 
 ## Versioning
 
-Package versions are `<MDI spec version>.<release>` — major.minor always
-equals the targeted MDI spec version (currently **2.0**), and the patch number
-is each package's own release counter starting at `.1`. So `2.0.5` means "5th
-release targeting MDI 2.0," and patch numbers are not synchronized across
-packages.
+Package versions are `<MDI spec version>.<release>` — major.minor always equals
+the targeted MDI spec version, and patch is each package's independent release
+counter starting at `.1`.

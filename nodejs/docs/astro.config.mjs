@@ -20,6 +20,7 @@ function remarkMdiSyntax() {
 }
 
 const packages = [
+	'mdi',
 	'micromark-extension-mdi',
 	'mdast-util-mdi',
 	'remark',
@@ -62,7 +63,7 @@ export default defineConfig({
 			title: 'MDI',
 			favicon: '/illusions-kanji.svg',
 			description:
-				'Node.js tooling for illusion Markdown (MDI) — parse .mdi and convert to HTML, PDF, EPUB, DOCX.',
+				'Rust-authoritative tooling for illusion Markdown (MDI), with thin language bindings and shared renderers.',
 			social: [
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/illusions-lab/MDI' },
 			],
