@@ -41,11 +41,15 @@ jobs:
       - name: Calculate next patch versions
         id: versions
         run: node scripts/compute-release-versions.mjs
+        env:
+          # A manual recovery run with no base SHA safely releases no packages.
+          RELEASE_BASE_SHA: ${{ github.event.before || github.sha }}
 
       - name: Publish next patch versions
         id: publish
         run: node scripts/publish-versioned-packages.mjs
         env:
+          RELEASE_PACKAGES: ${{ steps.versions.outputs.publishedPackages }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
 
