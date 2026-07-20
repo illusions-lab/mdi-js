@@ -6,7 +6,8 @@ on:
   pull_request:
 
 jobs:
-  build:
+  nodejs:
+    name: Node.js
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -27,7 +28,16 @@ jobs:
       - run: pnpm --filter @illusions-lab/mdi-to-pdf exec playwright install --with-deps chromium
       - run: pnpm typecheck
       - run: pnpm build
-      - run: pnpm test
+      - run: pnpm test:coverage
+
+      - name: Upload Node.js coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./nodejs/**/coverage/lcov.info
+          flags: nodejs
+          name: nodejs
+          fail_ci_if_error: true
 
   rust-native:
     name: Rust (${{ matrix.platform }})
@@ -62,3 +72,21 @@ jobs:
 
       - if: matrix.platform == 'Linux x64'
         run: cargo fmt --check && cargo clippy -- -D warnings
+
+      - name: Install cargo-llvm-cov
+        if: matrix.platform == 'Linux x64'
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Generate Rust coverage report
+        if: matrix.platform == 'Linux x64'
+        run: cargo llvm-cov --locked --lcov --output-path lcov.info
+
+      - name: Upload Rust coverage to Codecov
+        if: matrix.platform == 'Linux x64'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./mdi-core/lcov.info
+          flags: rust
+          name: rust
+          fail_ci_if_error: true
