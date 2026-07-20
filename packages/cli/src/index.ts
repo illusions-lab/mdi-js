@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, resolve } from "node:path";
+import iconv from "iconv-lite";
 import { unified } from "unified";
 import remarkParse from "remark-parse";
 import remarkMdi from "@illusions-lab/mdi-remark";
@@ -62,7 +63,7 @@ export async function build(
     const outputs = await Promise.all(
       TEXT_OUTPUT_FORMATS.map(async (textFormat) => {
         const destination = defaultOutputPath(input, textFormat, "txt");
-        await writeFile(destination, mdiToTextFormat(tree, resolvedOptions.profile, textFormat));
+        await writeTextOutput(destination, mdiToTextFormat(tree, resolvedOptions.profile, textFormat), textFormat);
         return resolve(destination);
       })
     );
@@ -89,7 +90,11 @@ export async function build(
   const destination =
     resolvedOptions.output ??
     defaultOutputPath(input, format, extension);
-  await writeFile(destination, result);
+  if (isTextFormat(format)) {
+    await writeTextOutput(destination, result as string, format);
+  } else {
+    await writeFile(destination, result);
+  }
   return resolve(destination);
 }
 
@@ -156,6 +161,10 @@ export function mdiToTextFormat(tree: Root, profile: ExportProfile | undefined, 
   const prefix = settings.fullwidthSpaceIndent ? "　".repeat(settings.indentCount) : "";
   const text = renderText(tree, format, prefix);
   return format === "aozora" ? text.replaceAll("\n", "\r\n") : text;
+}
+
+async function writeTextOutput(destination: string, text: string, format: TextOutputFormat): Promise<void> {
+  await writeFile(destination, format === "aozora" ? iconv.encode(text, "shift_jis") : text);
 }
 
 function defaultOutputPath(input: string, format: OutputFormat, extension: string): string {
