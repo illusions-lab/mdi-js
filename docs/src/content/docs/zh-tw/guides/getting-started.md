@@ -20,10 +20,15 @@ mdi build novel.mdi --to html
 mdi build novel.mdi --to pdf
 mdi build novel.mdi --to epub -o dist/novel.epub
 mdi build novel.mdi --to docx
+mdi build novel.mdi --to txt
+mdi build novel.mdi --to txt-ruby
 ```
 
 不加 `-o` 時，輸出檔會寫在輸入檔旁邊、換上對應格式的副檔名
 （`novel.mdi` → `novel.pdf`）。
+
+`txt` 輸出基本純文字；`txt-ruby` 會以 `{base|reading}` 保留ルビ。兩者目前都不是
+小説家になろう或青空文庫的專用格式。
 
 :::note
 PDF 輸出透過 [Playwright](https://playwright.dev) 的無頭 Chromium 渲染 —
