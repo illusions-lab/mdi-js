@@ -1,5 +1,12 @@
 # mdast-util-mdi
 
+## 2.0.16
+
+### Patch Changes
+
+- Updated dependencies
+  - @illusions-lab/mdi-core@2.0.2
+
 ## 2.0.3
 
 ### Patch Changes

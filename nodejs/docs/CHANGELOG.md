@@ -1,5 +1,12 @@
 # docs
 
+## 0.0.5
+
+### Patch Changes
+
+- mdast-util-mdi@2.0.4
+- @illusions-lab/mdi-to-hast@2.0.6
+
 ## 0.0.4
 
 ### Patch Changes

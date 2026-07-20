@@ -56,39 +56,18 @@ importers:
 
   packages/cli:
     dependencies:
+      '@illusions-lab/mdi':
+        specifier: workspace:*
+        version: link:../mdi
       '@illusions-lab/mdi-export-profile':
         specifier: workspace:*
         version: link:../export-profile
-      '@illusions-lab/mdi-remark':
-        specifier: workspace:*
-        version: link:../remark
-      '@illusions-lab/mdi-to-docx':
-        specifier: workspace:*
-        version: link:../to-docx
-      '@illusions-lab/mdi-to-epub':
-        specifier: workspace:*
-        version: link:../to-epub
-      '@illusions-lab/mdi-to-html':
-        specifier: workspace:*
-        version: link:../to-html
       '@illusions-lab/mdi-to-pdf':
         specifier: workspace:*
         version: link:../to-pdf
-      '@types/mdast':
-        specifier: ^4.0.0
-        version: 4.0.4
       iconv-lite:
         specifier: ^0.6.3
         version: 0.6.3
-      mdast-util-mdi:
-        specifier: workspace:*
-        version: link:../mdast-util-mdi
-      remark-parse:
-        specifier: ^11.0.0
-        version: 11.0.0
-      unified:
-        specifier: ^11.0.0
-        version: 11.0.5
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -191,6 +170,9 @@ importers:
 
   packages/remark:
     dependencies:
+      '@illusions-lab/mdi':
+        specifier: workspace:*
+        version: link:../mdi
       '@types/mdast':
         specifier: ^4.0.0
         version: 4.0.4

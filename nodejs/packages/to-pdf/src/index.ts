@@ -10,26 +10,22 @@ import {
 
 export const MDI_SPEC_VERSION = "2.0";
 
-/** Renders an MDI document with the complete Illusions PDF export profile. */
-export async function mdiToPdf(
-  tree: Root,
-  profile?: ExportProfile
+/**
+ * Print a complete, already-rendered MDI HTML document through Chromium.
+ *
+ * This is deliberately a layout adapter: callers must obtain the HTML from
+ * the Rust core and must not supply an alternative MDI parser or renderer.
+ */
+export async function renderHtmlToPdf(
+  html: string,
+  profile?: ExportProfile,
+  sourceWritingMode?: unknown
 ): Promise<Buffer> {
-  const sourceWritingMode = (
-    tree.data as { frontmatter?: { writingMode?: unknown } } | undefined
-  )?.frontmatter?.writingMode;
   const resolved = resolvePrintProfile(profile, sourceWritingMode);
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage();
-    await page.setContent(applyPdfProfile(mdiToHtml(tree), resolved));
-    const dimensions = PAGE_DIMENSIONS[resolved.pagination.pageSize];
-    const width = resolved.pagination.landscape
-      ? dimensions.height
-      : dimensions.width;
-    const height = resolved.pagination.landscape
-      ? dimensions.width
-      : dimensions.height;
+    await page.setContent(applyPdfProfile(html, resolved));
     const pageNumber = resolved.pagination.pageNumbers;
     return Buffer.from(
       await page.pdf({
@@ -50,6 +46,17 @@ export async function mdiToPdf(
   } finally {
     await browser.close();
   }
+}
+
+/** Renders an MDI document with the complete Illusions PDF export profile. */
+export async function mdiToPdf(
+  tree: Root,
+  profile?: ExportProfile
+): Promise<Buffer> {
+  const sourceWritingMode = (
+    tree.data as { frontmatter?: { writingMode?: unknown } } | undefined
+  )?.frontmatter?.writingMode;
+  return renderHtmlToPdf(mdiToHtml(tree), profile, sourceWritingMode);
 }
 
 /** Converts page geometry and Japanese composition settings into isolated print CSS. */

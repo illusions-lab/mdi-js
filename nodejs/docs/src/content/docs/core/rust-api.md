@@ -17,11 +17,15 @@ This page documents only symbols present in `mdi-core/src/lib.rs` today. It is a
 - `serialize_mdi(&str) -> String` / `serialize_mdi_document(&Document) -> String` — canonical MDI serialization
 - `render_html(&str) -> String` / `render_html_document(&Document) -> String` — standalone Rust HTML rendering
 - `render_text(&str) -> String` / `render_text_document(&Document) -> String` — deterministic plain-text rendering
+- `render_text_format(&str, TextFormat, &str) -> String` — TXT, ruby, Narou, Kakuyomu, and Aozora conventions
+- `render_epub(&str) -> Result<Vec<u8>, String>` — baseline EPUB 3 archive
+- `render_docx(&str) -> Result<Vec<u8>, String>` — baseline DOCX archive
+- `render_pdf(&str, &PdfOptions) -> Result<Vec<u8>, String>` — Rust-controlled PDF layout through the configured Chromium host
 
 The public data types include `ParseOutput`, `ParserCapabilities`, `Diagnostic`, `DiagnosticSeverity`, `SourceSpan`, `Document`, `Frontmatter`, `FrontmatterEntry`, `MdiSyntaxDocument`, `MdiBlock`, `PagebreakVariant`, `Inline`, and `RubyReading`.
 
 ## Not documented as implemented
 
-Validation diagnostics are exposed by `parse_output`; a separate validation-only API is not yet public. Rust `serialize_mdi`, `render_html`, and baseline `render_text` are available now. Export-profile-specific TXT, EPUB, DOCX, and Chromium-controlled PDF APIs remain Planned.
+Validation diagnostics are exposed by `parse_output`; a separate validation-only API is not yet public. Rust now provides baseline serializer and output APIs for every shipped format. Cover media, detailed DOCX typography, and full export-profile/pagination parity remain later extensions of those APIs.
 
 See [Bindings: Rust](/bindings/rust/) for usage and [ARCHITECTURE.md](https://github.com/illusions-lab/MDI/blob/main/ARCHITECTURE.md) for the intended contract.

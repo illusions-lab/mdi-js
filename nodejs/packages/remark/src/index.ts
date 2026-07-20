@@ -1,7 +1,8 @@
-import { mdiFromMarkdown, mdiToMarkdown } from "mdast-util-mdi";
-import { mdi } from "micromark-extension-mdi";
+import { parse, type MdiDocument, type MdiNode } from "@illusions-lab/mdi";
+import { mdiToMarkdown } from "mdast-util-mdi";
 import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
+import type { Root } from "mdast";
 import type {} from "remark-parse";
 import type {} from "remark-stringify";
 import type { Processor } from "unified";
@@ -10,14 +11,66 @@ import { resolveFrontmatter } from "./frontmatter.js";
 export const MDI_SPEC_VERSION = "2.0";
 export type { MdiFrontmatter } from "./frontmatter.js";
 
+/**
+ * Unified ecosystem adapter for the Rust-owned MDI parser.
+ *
+ * `Parser` is deliberately replaced instead of adding micromark extensions:
+ * CommonMark, GFM, front matter, and MDI boundaries are decided by
+ * `@illusions-lab/mdi` (WASM/Rust), then mapped into ordinary mdast objects.
+ */
 export default function remarkMdi(this: Processor): void {
 	const data = this.data();
-
-	(data.micromarkExtensions ??= []).push(mdi());
-	(data.fromMarkdownExtensions ??= []).push(mdiFromMarkdown());
 	(data.toMarkdownExtensions ??= []).push(mdiToMarkdown());
 
+	// remark-gfm still contributes mdast-to-markdown handlers for serialization.
+	// Its parser hooks are never reached because this adapter owns `Parser`.
 	this.use(remarkGfm);
 	this.use(remarkFrontmatter, ["yaml"]);
-	this.use(() => resolveFrontmatter);
+	(this as unknown as { parser: (source: string) => Root }).parser = (source) => {
+		const tree = toMdast(parse(source).document);
+		resolveFrontmatter(tree);
+		return tree;
+	};
+}
+
+function toMdast(document: MdiDocument): Root {
+	const children = document.children.map(toMdastNode) as unknown as Root["children"];
+	if (document.frontmatter) {
+		children.unshift({ type: "yaml", value: document.frontmatter.raw });
+	}
+	return { type: "root", children };
+}
+
+function toMdastNode(node: MdiNode): Record<string, unknown> {
+	const { span: _span, children, ...rest } = node;
+	const mapped: Record<string, unknown> = { ...rest };
+	if (children) mapped.children = children.map(toMdastNode);
+
+	switch (node.type) {
+		case "ruby": {
+			const ruby = node.ruby as { type: string; value: string | string[] };
+			return { ...mapped, type: "mdiRuby", ruby: ruby.value };
+		}
+		case "tcy": return { ...mapped, type: "mdiTcy" };
+		case "break": return { ...mapped, type: "mdiBreak" };
+		case "em": return { ...mapped, type: "mdiEm" };
+		case "noBreak": return { ...mapped, type: "mdiNoBreak" };
+		case "warichu": return { ...mapped, type: "mdiWarichu" };
+		case "kern": return { ...mapped, type: "mdiKern" };
+		case "blank": return { ...mapped, type: "mdiBlank" };
+		case "pagebreak": {
+			if (mapped.variant === null) delete mapped.variant;
+			return { ...mapped, type: "mdiPagebreak" };
+		}
+		case "paragraph": {
+			const data: Record<string, unknown> = {};
+			if (typeof mapped.indent === "number") data.mdiIndent = mapped.indent;
+			if (typeof mapped.bottom === "number") data.mdiBottom = mapped.bottom;
+			delete mapped.indent;
+			delete mapped.bottom;
+			if (Object.keys(data).length) mapped.data = data;
+			return mapped;
+		}
+		default: return mapped;
+	}
 }

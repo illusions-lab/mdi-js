@@ -1,6 +1,6 @@
 {
   "name": "@illusions-lab/mdi-cli",
-  "version": "2.0.5",
+  "version": "2.0.18",
   "description": "Command-line interface for converting MDI (.mdi) documents",
   "license": "MIT",
   "repository": {
@@ -25,16 +25,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@illusions-lab/mdi": "workspace:*",
     "@illusions-lab/mdi-export-profile": "workspace:*",
-    "@illusions-lab/mdi-remark": "workspace:*",
-    "@illusions-lab/mdi-to-html": "workspace:*",
     "@illusions-lab/mdi-to-pdf": "workspace:*",
-    "@illusions-lab/mdi-to-epub": "workspace:*",
-    "@illusions-lab/mdi-to-docx": "workspace:*",
-    "mdast-util-mdi": "workspace:*",
-    "remark-parse": "^11.0.0",
-    "unified": "^11.0.0",
-    "@types/mdast": "^4.0.0",
     "iconv-lite": "^0.6.3"
   },
   "devDependencies": {
