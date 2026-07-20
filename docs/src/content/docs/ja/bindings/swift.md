@@ -1,19 +1,21 @@
 ---
 title: Swift
-description: Rust を正とする MDI grammar と Document IR を利用する Swift binding。
+description: Swift から MDI の Rust コアと文書 IR を利用する
 ---
 
-Swift はサポート済みの MDI binding です。Rust、Node.js、Kotlin、Python と同じ Rust-authoritative grammar と versioned Document IR を使い、Swift 側に別の parser は持ちません。
+Swift バインディングは、他の MDI バインディングと同じ Rust 製コアを使用する。Swift 側で MDI 構文やレンダリング規則を再実装することはない。
 
-## SwiftPM から使う
+## SwiftPM から導入する
 
-この repository の Swift package を SwiftPM project に追加し、application target から `MDI` を import します。package manifest は [`swift/Package.swift`](https://github.com/illusions-lab/MDI/blob/main/swift/Package.swift) にあります。
+SwiftPM プロジェクトにこのリポジトリの Swift パッケージを追加し、アプリケーションターゲットから `MDI` を import する。パッケージ定義は [`swift/Package.swift`](https://github.com/illusions-lab/MDI/blob/main/swift/Package.swift) を参照のこと。
 
-## Binding contract
+[TODO: Package.swift に記載された依存関係、対応プラットフォーム、および公開モジュール名をリリースごとに確認すること。]
 
-- 完全な `.mdi` source を共通 Rust grammar で parse します。
-- syntax version、IR version、diagnostics、UTF-8 byte span をそのまま保持します。
-- 他の MDI binding と同じ Document IR から render します。
-- grammar、delimiter fallback、renderer semantics を Swift に再実装しません。
+## 共通の動作
 
-言語共通の動作は [Document IR](/ja/core/document-ir/)、[Diagnostics](/ja/core/diagnostics/)、[Rendering model](/ja/core/rendering/) を参照してください。
+- 完全な `.mdi` ソースを共通の Rust コアで解析する。
+- 構文バージョン、IR バージョン、診断情報、UTF-8 バイト単位のソース位置を保持する。
+- 文書 IR を基に各出力を生成する。
+- 区切り記号の解釈やリテラルフォールバックを Swift 側で再実装しない。
+
+言語共通のモデルは、[ドキュメント IR](/ja/core/document-ir/)、[診断とソース位置](/ja/core/diagnostics/)、[レンダリングモデル](/ja/core/rendering/)を参照のこと。
