@@ -21,10 +21,10 @@ MDI の実装は言語ごとに分割されており、各ディレクトリは�
 
 | Directory | Language | Status |
 |-----------|----------|--------|
-| [`mdi-core/`](./mdi-core) | Rust | Language-neutral grammar core (escapes, ruby, tate-chu-yoko, macros). Not yet consumed by the Node.js packages below. |
-| [`nodejs/`](./nodejs) | Node.js / TypeScript | Parser, converters (HTML/PDF/EPUB/DOCX), CLI, and the docs site — see below. |
-| [`swift/`](./swift) | Swift | Placeholder package, not yet implemented. |
-| [`python/`](./python) | Python | Placeholder package, not yet implemented. |
+| [`mdi-core/`](./mdi-core) | Rust | Language-neutral grammar core (escapes, ruby, tate-chu-yoko, macros). Compiled to wasm and consumed by `nodejs/`'s `mdast-util-mdi` for the semantic resolution layer (ruby split/group, block-macro classification, escape handling). Not yet consumed by Python or Swift. |
+| [`nodejs/`](./nodejs) | Node.js / TypeScript | Parser, converters (HTML/PDF/EPUB/DOCX), CLI, and the docs site — see below. The tokenizer (`micromark-extension-mdi`) stays JavaScript-only; `mdast-util-mdi` bridges into `mdi-core` via [`@illusions-lab/mdi-core`](./nodejs/packages/mdi-core) (wasm-bindgen). |
+| [`swift/`](./swift) | Swift | Placeholder package, not yet implemented. Will bind to `mdi-core` natively (UniFFI / swift-bridge) once built. |
+| [`python/`](./python) | Python | Placeholder package, not yet implemented. Will bind to `mdi-core` natively (PyO3) once built. |
 
 ---
 
@@ -54,22 +54,57 @@ HTML・PDF・EPUB の 3 つは HTML 系フォーマットであり、同じ mdas
 
 ```mermaid
 flowchart TD
-  micromark["micromark-extension-mdi"] --> mdastUtil["mdast-util-mdi"]
-  mdastUtil --> remark["@illusions-lab/mdi-remark"]
+  subgraph rustCore["mdi-core/ — Rust, language-neutral grammar"]
+    core["mdi-core<br/>escapes · ruby split/group · tate-chu-yoko · boten · block macros"]
+  end
 
-  remark -->|MDI mdast tree| hast["@illusions-lab/mdi-to-hast"]
-  hast --> html["@illusions-lab/mdi-to-html"]
-  html --> pdf["@illusions-lab/mdi-to-pdf"]
-  hast --> epub["@illusions-lab/mdi-to-epub"]
-  remark -->|MDI mdast tree| docx["@illusions-lab/mdi-to-docx"]
+  subgraph nodejsLayer["nodejs/ — Node.js / TypeScript"]
+    wasmBridge["@illusions-lab/mdi-core<br/>(wasm-bindgen bridge)"]
+    micromark["micromark-extension-mdi"] --> mdastUtil["mdast-util-mdi"]
+    wasmBridge -->|"unescapeMdi · unescapeRubyText<br/>resolveRuby<br/>blockMacroKind/Amount/Variant"| mdastUtil
+    mdastUtil --> remark["@illusions-lab/mdi-remark"]
 
+    remark -->|MDI mdast tree| hast["@illusions-lab/mdi-to-hast"]
+    hast --> html["@illusions-lab/mdi-to-html"]
+    html --> pdf["@illusions-lab/mdi-to-pdf"]
+    hast --> epub["@illusions-lab/mdi-to-epub"]
+    remark -->|MDI mdast tree| docx["@illusions-lab/mdi-to-docx"]
+  end
+
+  subgraph pythonLayer["python/ — placeholder"]
+    pyBindings["PyO3 bindings (planned)"]
+  end
+
+  subgraph swiftLayer["swift/ — placeholder"]
+    swiftBindings["UniFFI / swift-bridge bindings (planned)"]
+  end
+
+  core --> wasmBridge
+  core -.-> pyBindings
+  core -.-> swiftBindings
+
+  classDef rustcore fill:#fde7e7,stroke:#ea4335,color:#202124
+  classDef bridge fill:#f3e8fd,stroke:#a142f4,color:#202124
   classDef parser fill:#e8f0fe,stroke:#4285f4,color:#202124
   classDef transform fill:#e6f4ea,stroke:#34a853,color:#202124
   classDef converter fill:#fef7e0,stroke:#f9ab00,color:#202124
+  classDef placeholder fill:#f1f3f4,stroke:#9aa0a6,color:#5f6368,stroke-dasharray: 5 5
+  class core rustcore
+  class wasmBridge bridge
   class micromark,mdastUtil,remark parser
   class hast transform
   class html,pdf,epub,docx converter
+  class pyBindings,swiftBindings placeholder
 ```
+
+The **tokenizer** (`micromark-extension-mdi`) scans MDI syntax interleaved
+character-by-character with CommonMark, so it stays JavaScript-only. The
+**semantic resolution rules** inside `mdast-util-mdi` — ruby split/group
+resolution, block-macro classification, MDI escape handling — call into
+`mdi-core` through the wasm bridge instead of re-implementing the same rules
+in TypeScript. Python and Swift don't carry that CommonMark-interleaving
+constraint, so once built they can bind to `mdi-core` directly (native
+PyO3 / UniFFI, no wasm hop).
 
 All converters consume the **same mdast tree** produced by `@illusions-lab/mdi-remark`, so editor-path and export-path behavior stay in sync (see [SYNTAX.md § Parsing Order](./SYNTAX.md#parsing-order--パース順序)).
 
@@ -96,12 +131,21 @@ cargo test
 ```
 
 `mdi-core` implements the MDI-only grammar (escapes, grapheme-aware ruby,
-tate-chu-yoko, inline macros, and block macros) as a language-neutral AST. It
-is not yet consumed by `nodejs/`; the published Node.js API remains the
-existing micromark/remark integration. The canonical grammar and its
-versioned specification live in [`SYNTAX.md`](./SYNTAX.md) in this
-repository. The Swift and Python packages will consume `mdi-core` once
+tate-chu-yoko, inline macros, and block macros) as a language-neutral AST.
+`nodejs/` consumes it via a wasm-bindgen bridge
+([`@illusions-lab/mdi-core`](./nodejs/packages/mdi-core)) for the semantic
+resolution rules — ruby split/group, block-macro classification, and MDI
+escape handling — inside `mdast-util-mdi`. The micromark tokenizer, which
+scans MDI syntax interleaved character-by-character with CommonMark, stays
+JavaScript-only. The canonical grammar and its versioned specification live
+in [`SYNTAX.md`](./SYNTAX.md) in this repository. The Swift and Python
+packages will bind to `mdi-core` directly (no wasm hop needed) once
 implemented.
+
+Rebuilding the wasm bridge needs a `wasm32-unknown-unknown` Rust target and
+`wasm-pack` in addition to the plain `cargo build`/`cargo test` toolchain
+above; `pnpm build` in `nodejs/` runs it as part of the normal workspace
+build.
 
 CI runs the Rust core natively on Linux, macOS, and Windows for both x64 and
 ARM64. The JavaScript integration suite (including Chromium PDF output) runs
