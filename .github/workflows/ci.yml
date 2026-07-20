@@ -8,12 +8,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nodejs
     steps:
       - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy,rustfmt
 
       - uses: pnpm/action-setup@v4
 
@@ -21,6 +20,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+          cache-dependency-path: nodejs/pnpm-lock.yaml
 
       - run: pnpm install --frozen-lockfile
       # to-pdf's tests print through a real headless Chromium.
@@ -48,6 +48,9 @@ jobs:
           - platform: Windows ARM64
             runner: windows-11-arm
     runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: mdi-core
     steps:
       - uses: actions/checkout@v4
 
@@ -55,7 +58,7 @@ jobs:
         with:
           components: clippy,rustfmt
 
-      - run: cargo test --workspace
+      - run: cargo test
 
       - if: matrix.platform == 'Linux x64'
-        run: cargo fmt --check && cargo clippy --workspace -- -D warnings
+        run: cargo fmt --check && cargo clippy -- -D warnings

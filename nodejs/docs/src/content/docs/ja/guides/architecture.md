@@ -72,7 +72,7 @@ MDI の正規の文法は、本リポジトリの
 で管理します。このリポジトリは既存の `mdi-js` 名と JavaScript の公開 API を
 維持します。
 
-`crates/mdi-core` は、エスケープ、書記素クラスタ対応のルビ、縦中横、傍点、
+`mdi-core` は、エスケープ、書記素クラスタ対応のルビ、縦中横、傍点、
 入れ子にできるインラインマクロ、ブロックマクロを扱う、言語非依存の Rust
 実装です。CommonMark と GFM は意図的に解析せず、JavaScript アダプタ側の
 micromark/remark に残します。これにより既存の mdast API と JS 利用者の挙動を

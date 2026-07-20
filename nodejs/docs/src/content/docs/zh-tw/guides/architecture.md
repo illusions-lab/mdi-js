@@ -64,7 +64,7 @@ MDI 的權威語法由本倉庫的
 [`SYNTAX.md`](https://github.com/illusions-lab/mdi-js/blob/main/SYNTAX.md)
 管理。本倉庫維持既有的 `mdi-js` 名稱與 JavaScript 公開 API。
 
-`crates/mdi-core` 是語言中立的 Rust 實作，處理 escape、以 grapheme cluster
+`mdi-core` 是語言中立的 Rust 實作，處理 escape、以 grapheme cluster
 為單位的 ruby、縦中横、傍點、可巢狀的行內 macro 與區塊 macro。它刻意**不**
 解析 CommonMark 或 GFM；這些仍由 JavaScript adapter 中的 micromark/remark
 處理。因此既有 mdast API 和所有 JS 使用者的行為都能維持不變。

@@ -68,7 +68,7 @@ The canonical MDI grammar lives in [`SYNTAX.md`](https://github.com/illusions-la
 in this repository. This repository keeps its existing `mdi-js` name and
 JavaScript public API.
 
-`crates/mdi-core` is a language-neutral Rust implementation of the
+`mdi-core` is a language-neutral Rust implementation of the
 MDI-specific grammar: escapes, grapheme-aware ruby, tate-chu-yoko, boten,
 nestable inline macros, and MDI block macros. It intentionally does **not**
 parse CommonMark or GFM; those stay with micromark/remark in the JavaScript

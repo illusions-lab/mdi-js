@@ -15,14 +15,13 @@ jobs:
     permissions:
       contents: write
       id-token: write
+    defaults:
+      run:
+        working-directory: nodejs
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy,rustfmt
 
       - uses: pnpm/action-setup@v4
 
@@ -30,6 +29,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+          cache-dependency-path: nodejs/pnpm-lock.yaml
           registry-url: https://registry.npmjs.org
 
       - run: pnpm install --frozen-lockfile
