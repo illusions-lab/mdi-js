@@ -43,6 +43,34 @@ describe("renderHtmlToPdf", () =>
     expect(pdf.length).toBeGreaterThan(500);
   }, 30_000));
 
+describe("PDF page-number layout", () => {
+  const profile = (format: "simple" | "dash" | "fraction", position: "top-left" | "bottom-right") => ({
+    metadata: {},
+    typesetting: { writingMode: "horizontal" as const, fontFamily: "serif", textIndentEm: 1, fullwidthSpaceIndent: false },
+    pagination: {
+      pageSize: "A4" as const,
+      landscape: false,
+      charactersPerLine: 40,
+      linesPerPage: 30,
+      margins: { top: 25.4, right: 25.4, bottom: 25.4, left: 25.4 },
+      pageNumbers: { enabled: true, format, position },
+    },
+    epub: { chapterSplitLevel: "h1" as const },
+    text: { fullwidthSpaceIndent: false, indentCount: 1 },
+  });
+
+  it.each([
+    ["dash", "top-left"],
+    ["fraction", "bottom-right"],
+  ] as const)("renders %s numbering at %s", async (format, position) => {
+    const pdf = await renderHtmlToPdf(
+      "<html><head></head><body><p>numbered</p></body></html>",
+      profile(format, position),
+    );
+    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+  }, 30_000);
+});
+
 describe("PDF export profile", () => {
   it("uses a readable A4 portrait baseline for horizontal documents", () => {
     const html = applyPdfProfile(
