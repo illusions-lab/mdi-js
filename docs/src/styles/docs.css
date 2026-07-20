@@ -1,11 +1,255 @@
+/* MDI documentation: the same quiet, snow-country monochrome as illusions.app. */
+:root {
+	--sl-font: "Zen Old Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+	--sl-font-system: "Zen Old Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+	--sl-font-system-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+	--sl-color-accent-low: rgba(255, 255, 255, 0.1);
+	--sl-color-accent: #ffffff;
+	--sl-color-accent-high: #ffffff;
+	--sl-color-white: #f0f0f0;
+	--sl-color-gray-1: rgba(240, 240, 240, 0.82);
+	--sl-color-gray-2: rgba(240, 240, 240, 0.62);
+	--sl-color-gray-3: rgba(240, 240, 240, 0.45);
+	--sl-color-gray-4: rgba(255, 255, 255, 0.18);
+	--sl-color-gray-5: rgba(255, 255, 255, 0.12);
+	--sl-color-gray-6: #111112;
+	--sl-color-black: #060606;
+	--sl-color-text: #f0f0f0;
+	--sl-color-text-accent: #ffffff;
+	--sl-color-bg: #060606;
+	--sl-color-bg-nav: rgba(6, 6, 6, 0.74);
+	--sl-color-bg-sidebar: rgba(6, 6, 6, 0.56);
+	--sl-color-hairline: rgba(255, 255, 255, 0.12);
+}
+
+html {
+	background: #060606;
+}
+
+body {
+	background:
+		radial-gradient(ellipse 75% 36% at 50% -12%, rgba(255, 255, 255, 0.08), transparent 72%),
+		linear-gradient(180deg, #101011 0, #060606 30rem);
+	color: var(--sl-color-white);
+	font-family: var(--sl-font);
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+}
+
+/* Navigation becomes a restrained sheet of smoked glass. */
+header.header {
+	background: var(--sl-color-bg-nav);
+	border-bottom-color: var(--sl-color-hairline);
+	backdrop-filter: blur(18px);
+	-webkit-backdrop-filter: blur(18px);
+	box-shadow: 0 10px 32px rgba(0, 0, 0, 0.3);
+}
+
+.site-title,
+.site-title:hover,
+.site-title:focus-visible {
+	color: #fff;
+	letter-spacing: 0.08em;
+}
+
+.site-title img {
+	filter: grayscale(1) brightness(2);
+}
+
+.right-sidebar-container,
+.sidebar-pane {
+	background: var(--sl-color-bg-sidebar);
+	backdrop-filter: blur(14px);
+	-webkit-backdrop-filter: blur(14px);
+}
+
+.sidebar-pane {
+	border-inline-end-color: var(--sl-color-hairline);
+}
+
+.sidebar-content a {
+	border-radius: 0.35rem;
+	color: var(--sl-color-gray-2);
+	transition: background-color 160ms ease, color 160ms ease;
+}
+
+.sidebar-content a:hover {
+	background: rgba(255, 255, 255, 0.06);
+	color: #fff;
+}
+
+.sidebar-content a[aria-current='page'] {
+	background: rgba(255, 255, 255, 0.11);
+	color: #fff;
+	box-shadow: inset 2px 0 0 #fff;
+}
+
+.sidebar-content summary,
+.right-sidebar a {
+	color: var(--sl-color-gray-2);
+}
+
+.right-sidebar a[aria-current='true'],
+.right-sidebar a:hover {
+	color: #fff;
+}
+
+/* The reading column has no cards around it: typography and fine rules do the work. */
+.content-panel {
+	background: transparent;
+}
+
+.sl-markdown-content {
+	font-size: 1rem;
+	line-height: 1.9;
+}
+
+.sl-markdown-content :is(h1, h2, h3, h4) {
+	color: #fff;
+	font-weight: 600;
+	letter-spacing: 0.045em;
+	line-height: 1.35;
+}
+
+.sl-markdown-content h1 {
+	font-size: clamp(2.2rem, 5vw, 3.7rem);
+	letter-spacing: 0.075em;
+}
+
+.sl-markdown-content h2 {
+	border-bottom: 1px solid var(--sl-color-hairline);
+	padding-bottom: 0.55rem;
+	margin-top: 3.5rem;
+}
+
+.sl-markdown-content a:not(.not-content) {
+	color: #fff;
+	text-decoration-color: rgba(255, 255, 255, 0.38);
+	text-underline-offset: 0.22em;
+}
+
+.sl-markdown-content a:not(.not-content):hover {
+	text-decoration-color: #fff;
+}
+
+.sl-markdown-content :is(hr, blockquote) {
+	border-color: var(--sl-color-hairline);
+}
+
+.sl-markdown-content blockquote {
+	background: rgba(255, 255, 255, 0.035);
+	border-inline-start-color: rgba(255, 255, 255, 0.55);
+	border-radius: 0 0.4rem 0.4rem 0;
+	color: var(--sl-color-gray-1);
+}
+
+.sl-markdown-content :not(pre) > code {
+	background: rgba(255, 255, 255, 0.09);
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 0.25rem;
+	color: #fff;
+	font-family: var(--sl-font-system-mono);
+}
+
+/* Expressive Code, code groups, and the splash-page Code component. */
+.expressive-code,
+.starlight-aside,
+.sl-markdown-content pre {
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 0.6rem;
+	box-shadow: 0 18px 36px rgba(0, 0, 0, 0.2);
+}
+
+.expressive-code :is(pre, .frame),
+.sl-markdown-content pre {
+	background: #0b0b0c !important;
+}
+
+.expressive-code .header,
+.expressive-code figcaption {
+	background: rgba(255, 255, 255, 0.045) !important;
+	border-bottom-color: var(--sl-color-hairline) !important;
+}
+
+/* Cards feel like frosted paper, with a small lift on hover. */
+.card {
+	background: rgba(255, 255, 255, 0.035);
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 0.6rem;
+	box-shadow: none;
+	transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.card:hover {
+	background: rgba(255, 255, 255, 0.075);
+	border-color: rgba(255, 255, 255, 0.32);
+	transform: translateY(-2px);
+}
+
+.card :is(h2, h3) {
+	color: #fff;
+	letter-spacing: 0.035em;
+}
+
+/* The splash page should feel like a landing page, without fighting Starlight's layout. */
+.hero {
+	padding-block: clamp(3.5rem, 9vw, 7rem) 3rem;
+}
+
+.hero h1 {
+	font-size: clamp(4rem, 12vw, 8rem);
+	font-weight: 500;
+	letter-spacing: 0.06em;
+	text-shadow: 0 1px 18px rgba(255, 255, 255, 0.13);
+}
+
+.hero .tagline {
+	color: var(--sl-color-gray-1);
+	font-size: clamp(1.1rem, 2vw, 1.38rem);
+	line-height: 1.8;
+	max-width: 48rem;
+}
+
+.hero .sl-link-button {
+	border-radius: 999px;
+	transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+
+.hero .sl-link-button.primary {
+	background: #f0f0f0;
+	border-color: #f0f0f0;
+	color: #060606;
+}
+
+.hero .sl-link-button.primary:hover {
+	background: #fff;
+	transform: translateY(-1px);
+}
+
+.hero .sl-link-button.minimal:hover {
+	background: rgba(255, 255, 255, 0.07);
+	border-color: var(--sl-color-hairline);
+}
+
+.pagination-links a,
+.sl-markdown-content table {
+	border-color: var(--sl-color-hairline);
+	background: rgba(255, 255, 255, 0.025);
+}
+
+.pagination-links a:hover {
+	background: rgba(255, 255, 255, 0.075);
+	border-color: rgba(255, 255, 255, 0.3);
+}
+
 /* Demo boxes on the syntax showcase pages. */
 .mdi-demo {
-	border: 1px solid var(--sl-color-gray-5);
-	border-inline-start: 4px solid var(--sl-color-accent);
-	border-radius: 0.5rem;
+	border: 1px solid var(--sl-color-hairline);
+	border-inline-start: 2px solid #fff;
+	border-radius: 0.45rem;
 	padding: 1rem 1.25rem;
 	margin-top: 1rem;
-	background: var(--sl-color-black);
+	background: rgba(255, 255, 255, 0.035);
 }
 
 .mdi-demo > :first-child {
@@ -23,4 +267,22 @@
 /* Give ruby some breathing room inside demos. */
 .mdi-demo ruby rt {
 	font-size: 0.5em;
+}
+
+@media (max-width: 50rem) {
+	.hero {
+		padding-top: 3rem;
+	}
+
+	.sl-markdown-content {
+		line-height: 1.8;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		transition-duration: 0.01ms !important;
+	}
 }
