@@ -9,9 +9,6 @@ jobs:
   nodejs:
     name: Node.js
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: nodejs
     steps:
       - uses: actions/checkout@v4
 
@@ -29,7 +26,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: nodejs/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - run: pnpm install --frozen-lockfile
       # to-pdf's tests print through a real headless Chromium.
@@ -87,7 +84,12 @@ jobs:
 
       - name: Generate Rust coverage report
         if: matrix.platform == 'Linux x64'
-        run: cargo llvm-cov --locked --lcov --output-path lcov.info
+        run: >-
+          cargo llvm-cov --locked
+          --fail-under-lines 90
+          --fail-under-functions 90
+          --fail-under-regions 90
+          --lcov --output-path lcov.info
 
       - name: Upload Rust coverage to Codecov
         if: matrix.platform == 'Linux x64'

@@ -1,0 +1,49 @@
+---
+title: MDI
+description: 由 Rust 驅動的 illusion Markdown (MDI) 工具鏈 — 所有平台共用一個解析器與一致輸出。
+template: splash
+hero:
+  tagline: illusion Markdown (MDI) 的單一 Rust 解析器，以及一致的 HTML、PDF、EPUB、DOCX、文字輸出。
+  actions:
+    - text: 快速上手
+      link: /zh-tw/guides/getting-started/
+      icon: right-arrow
+    - text: MDI 2.0 規範
+      link: https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+	<Card title="唯一真相來源" icon="seti:rust">
+		`mdi-core` 把 CommonMark、GFM、front matter 與所有 MDI 語法解析成
+		一份有版本的文件 IR。每個接口和輸出器都使用完全相同的語法判斷。
+	</Card>
+	<Card title="貨真價實的日文排版" icon="translate">
+		ルビ（注音假名）、縦中横、傍點、割注、字距調整、直書 — 全部作為
+		第一級語法解析，不是後處理補丁。看看[即時渲染展示](/zh-tw/syntax/showcase/)：
+		本網站就是用 MDI 自己的解析器渲染 MDI 的。
+	</Card>
+	<Card title="誠實而精簡的語言介面" icon="puzzle">
+		Rust、Node.js、Swift、Kotlin 與 Python 現在都已可使用，且都呼叫同一個 Rust core。各平台的安裝與 API 請見 [Bindings](/zh-tw/bindings/javascript/)。
+	</Card>
+	<Card title="一份來源，五種實際輸出" icon="document">
+		`renderHtml`、五種 `renderTextFormat`、`renderEpub`、`renderDocx`，以及透過 Chromium 的 Rust PDF 都已實作。詳見[輸出格式](/zh-tw/ecosystem/outputs/)。
+	</Card>
+	<Card title="附帶 CLI" icon="seti:shell">
+		`mdi build novel.mdi --to pdf` — 一行指令把書稿送入由 Rust 控制的
+		Chromium PDF 管線。
+	</Card>
+</CardGrid>
+
+## 30 秒試用
+
+```bash
+npm install --global @illusions-lab/mdi-cli
+echo '{雪女|ゆき.おんな}が現れた。第^12^話のことである。' > novel.mdi
+mdi build novel.mdi --to html
+```
+
+完整流程（PDF、EPUB、DOCX 與 export profile）請見[快速上手](/zh-tw/guides/getting-started/)。
