@@ -1,11 +1,11 @@
 # mdi-js
 
-**Node.js tooling for [illusion Markdown (MDI)](https://github.com/illusions-lab/MDI)** — parse `.mdi` files and convert them to HTML, PDF, EPUB, and DOCX.
+**Node.js tooling for illusion Markdown (MDI)** — parse `.mdi` files and convert them to HTML, PDF, EPUB, and DOCX.
 
 **illusion Markdown (MDI)** のための Node.js ツール群です。`.mdi` ファイルを解析し、HTML・PDF・EPUB・DOCX へ変換します。
 
-This repository targets **MDI 2.0** ([spec](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md)).  
-本リポジトリは **MDI 2.0**（[仕様書](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md)）に対応します。
+This repository is the canonical home of the **MDI spec** ([SYNTAX.md](./SYNTAX.md)) as well as its Node.js tooling; it currently targets **MDI 2.0**.  
+本リポジトリは **MDI 仕様書**（[SYNTAX.md](./SYNTAX.md)）と Node.js ツール群の両方を管理しており、現行仕様は **MDI 2.0** です。
 
 **📖 Documentation / ドキュメント: https://illusions-lab.github.io/mdi-js/** — guides, a live-rendered syntax showcase, and generated API reference (English / 日本語 / 正體中文). Built from [`docs/`](./docs).
 
@@ -54,7 +54,7 @@ flowchart TD
   class html,pdf,epub,docx converter
 ```
 
-All converters consume the **same mdast tree** produced by `@illusions-lab/mdi-remark`, so editor-path and export-path behavior stay in sync (see [SYNTAX.md § Parsing Order](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md#parsing-order--パース順序)).
+All converters consume the **same mdast tree** produced by `@illusions-lab/mdi-remark`, so editor-path and export-path behavior stay in sync (see [SYNTAX.md § Parsing Order](./SYNTAX.md#parsing-order--パース順序)).
 
 すべてのコンバータは `@illusions-lab/mdi-remark` が生成する**単一の mdast ツリー**を消費するため、エディタ側とエクスポート側の挙動が分岐しません。
 
@@ -75,10 +75,9 @@ pnpm test
 ruby, tate-chu-yoko, inline macros, and block macros) as a language-neutral
 AST. It is an internal workspace crate in this JavaScript-first release; the
 published Node.js API remains the existing micromark/remark integration. The
-canonical grammar and its versioned specification remain in
-[`illusions-lab/MDI`](https://github.com/illusions-lab/MDI), not in this
-repository. Native Node and Python bindings will consume this same core in
-later releases.
+canonical grammar and its versioned specification live in [`SYNTAX.md`](./SYNTAX.md)
+in this repository. Native Node and Python bindings will consume this same
+core in later releases.
 
 CI runs the Rust core natively on Linux, macOS, and Windows for both x64 and
 ARM64. The JavaScript integration suite (including Chromium PDF output) runs
@@ -110,11 +109,12 @@ Every package's version is `<MDI spec version>.<package release number>` — the
 
 ## Related projects / 関連プロジェクト
 
-- [illusions-lab/MDI](https://github.com/illusions-lab/MDI) — the MDI specification.
 - [illusions-lab/milkdown-mdi](https://github.com/illusions-lab/milkdown-mdi) — Milkdown editor plugins for MDI syntax support and vertical writing (縦書き) display.
 
 ---
 
 ## License
 
-MIT
+The Node.js tooling (`packages/`, `crates/`) is MIT — see [LICENSE](./LICENSE).
+
+The MDI specification ([`SYNTAX.md`](./SYNTAX.md)) is public domain — see [LICENSE-SPEC](./LICENSE-SPEC).

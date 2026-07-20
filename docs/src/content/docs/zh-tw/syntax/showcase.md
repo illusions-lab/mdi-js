@@ -9,7 +9,7 @@ description: MDI 2.0 的全部語法，由本網站用 mdi-js 自己的解析器
 實際產出的東西。
 
 語法的正式定義在
-[MDI 2.0 規範](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md)；
+[MDI 2.0 規範](https://github.com/illusions-lab/mdi-js/blob/main/SYNTAX.md)；
 本頁是展示，不是規範文本。
 
 ## ルビ（注音假名）

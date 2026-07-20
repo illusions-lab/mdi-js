@@ -8,7 +8,7 @@ mdi-js は **illusion Markdown (MDI)** — 日本語小説の組版のための 
 利用、2 つの使い方を説明します。
 
 このツールチェーンは **MDI 2.0**
-（[仕様書](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md)）に対応します。
+（[仕様書](https://github.com/illusions-lab/mdi-js/blob/main/SYNTAX.md)）に対応します。
 
 ## 最短ルート: CLI
 

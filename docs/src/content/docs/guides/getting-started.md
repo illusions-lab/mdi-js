@@ -8,7 +8,7 @@ dialect for Japanese novel typesetting. This page walks through the two ways to
 use it: the CLI and the programmatic API.
 
 This toolchain targets **MDI 2.0**
-([specification](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md)).
+([specification](https://github.com/illusions-lab/mdi-js/blob/main/SYNTAX.md)).
 
 ## The fast path: CLI
 
