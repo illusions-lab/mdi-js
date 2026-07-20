@@ -1,0 +1,43 @@
+{
+  "name": "mdast-util-mdi",
+  "version": "2.0.3",
+  "description": "mdast extension for MDI 2.0 (illusion Markdown) nodes",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/illusions-lab/MDI.git",
+    "directory": "nodejs/packages/mdast-util-mdi"
+  },
+  "homepage": "https://mdi.illusions.app/",
+  "bugs": "https://github.com/illusions-lab/MDI/issues",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@illusions-lab/mdi-core": "workspace:*",
+    "micromark-extension-mdi": "workspace:*",
+    "mdast-util-from-markdown": "^2.0.0",
+    "mdast-util-to-markdown": "^2.1.0",
+    "@types/mdast": "^4.0.0",
+    "@types/unist": "^3.0.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

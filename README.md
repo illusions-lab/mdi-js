@@ -1,92 +1,154 @@
-# mdi-js
+# MDI
 
-**Node.js tooling for [illusion Markdown (MDI)](https://github.com/illusions-lab/MDI)** — parse `.mdi` files and convert them to HTML, PDF, EPUB, and DOCX.
+[![codecov](https://codecov.io/github/illusions-lab/MDI/graph/badge.svg?token=J6GJZW744R)](https://codecov.io/github/illusions-lab/MDI)
 
-**illusion Markdown (MDI)** のための Node.js ツール群です。`.mdi` ファイルを解析し、HTML・PDF・EPUB・DOCX へ変換します。
+**illusion Markdown (MDI)** is a Markdown extension format for Japanese typography — ruby, tate-chu-yoko, boten, warichu, vertical writing, and more, inherited on top of standard Markdown.
 
-This repository targets **MDI 2.0** ([spec](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md)).  
-本リポジトリは **MDI 2.0**（[仕様書](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md)）に対応します。
+**illusion Markdown（MDI）** は、日本語組版のための Markdown 拡張フォーマットです。ルビ・縦中横・傍点・割注・縦書きなどを、標準 Markdown を継承しつつ拡張します。
 
-**📖 Documentation / ドキュメント: https://illusions-lab.github.io/mdi-js/** — guides, a live-rendered syntax showcase, and generated API reference (English / 日本語 / 正體中文). Built from [`docs/`](./docs).
+This repository is the canonical home of the **MDI 2.0 spec**
+([SYNTAX.md](./SYNTAX.md)), the Rust implementation, language bindings,
+renderers, and developer tools.
+
+本リポジトリは **MDI 2.0 仕様書**（[SYNTAX.md](./SYNTAX.md)）、Rust
+実装、各言語バインディング、レンダラー、開発ツールの正規リポジトリです。
+
+Rust is the **only executable authority** for MDI syntax and document
+semantics. It parses the complete document grammar—CommonMark, GFM, front
+matter, and MDI extensions—into one versioned document IR. JavaScript, Python,
+and Swift expose thin interfaces to the same Rust implementation.
+
+本專案採用 **Rust 單一權威架構**：CommonMark、GFM、front matter 與 MDI
+擴充語法均由 Rust 解析為同一份版本化文件 IR；JavaScript、Python、Swift
+僅提供薄接口。完整的權責與接口契約請見
+[`ARCHITECTURE.md`](./ARCHITECTURE.md)。
+
+**📖 Documentation / ドキュメント: https://mdi.illusions.app/** — guides, a live-rendered syntax showcase, and generated API reference (English / 日本語 / 正體中文). Built from [`nodejs/docs/`](./nodejs/docs).
 
 ---
 
-## Packages / パッケージ構成
+## Repository layout / リポジトリ構成
+
+Every language package exposes the same Rust implementation; no package owns
+an independent grammar or renderer semantics.
+
+各言語向けパッケージは、独立した構文実装を持たず、単一の Rust 実装へ
+接続する薄いバインディングです。
+
+| Directory | Language | Responsibility |
+|-----------|----------|----------------|
+| [`mdi-core/`](./mdi-core) | Rust | Complete parser, versioned document IR, validation, normalization, serialization, renderers, and Chromium PDF controller. |
+| [`nodejs/`](./nodejs) | Node.js / TypeScript | JavaScript and WebAssembly bindings, ecosystem adapters, CLI, and documentation. |
+| [`swift/`](./swift) | Swift | Native binding to `mdi-core` through UniFFI or a small C ABI. |
+| [`python/`](./python) | Python | Native binding to `mdi-core` through PyO3. |
+
+---
+
+## Packages / パッケージ構成 (`nodejs/`)
 
 | Package | Layer | Description |
 |---------|-------|-------------|
-| [`micromark-extension-mdi`](./packages/micromark-extension-mdi) | Parser core | Tokenizes MDI inline/block syntax (ruby, tate-chu-yoko, boten, kerning, warichu, blank paragraphs, page breaks, block alignment) on top of CommonMark. |
-| [`mdast-util-mdi`](./packages/mdast-util-mdi) | Parser core | Compiles micromark-mdi token events into mdast nodes, and back into markdown. |
-| [`@illusions-lab/mdi-remark`](./packages/remark) | Parser core | A single `remark` plugin bundling GFM, YAML front matter, and the MDI extensions — the recommended entry point for producing an MDI mdast tree. |
-| [`@illusions-lab/mdi-to-hast`](./packages/to-hast) | Shared transform | Maps MDI mdast nodes to hast, following the HTML mapping defined in the spec. Shared foundation for the HTML, PDF, and EPUB converters. |
-| [`@illusions-lab/mdi-to-html`](./packages/to-html) | Converter | Renders hast to an HTML string with the default MDI stylesheet. |
-| [`@illusions-lab/mdi-to-pdf`](./packages/to-pdf) | Converter | Renders `@illusions-lab/mdi-to-html` output to PDF via a headless browser, to get correct `vertical-rl` / `text-combine-upright` / `text-emphasis` support. |
-| [`@illusions-lab/mdi-to-epub`](./packages/to-epub) | Converter | Serializes `@illusions-lab/mdi-to-hast` output to valid EPUB XHTML and packages it (OPF manifest, nav, spine split on chapter/page breaks). |
-| [`@illusions-lab/mdi-to-docx`](./packages/to-docx) | Converter | Maps mdast directly to OOXML (native `<w:ruby>`, `<w:eastAsianLayout>`, section-level vertical writing) — does not go through HTML. |
-| [`@illusions-lab/mdi-cli`](./packages/cli) | CLI | `mdi build input.mdi --to html\|pdf\|epub\|docx` — thin wrapper around the converters above. |
+| [`@illusions-lab/mdi`](./nodejs/packages/mdi) | JavaScript binding | Primary typed API for parsing, validation, normalization, serialization, and rendering through Rust. |
+| [`@illusions-lab/mdi-core`](./nodejs/packages/mdi-core) | WebAssembly bridge | Generated low-level WebAssembly interface used by JavaScript packages. |
+| [`micromark-extension-mdi`](./nodejs/packages/micromark-extension-mdi) | Ecosystem adapter | Presents Rust-owned parse results through micromark-compatible events; contains no grammar rules. |
+| [`mdast-util-mdi`](./nodejs/packages/mdast-util-mdi) | Ecosystem adapter | Maps between the versioned Rust document IR and MDAST object shapes. |
+| [`@illusions-lab/mdi-remark`](./nodejs/packages/remark) | Remark adapter | Lets unified pipelines consume the Rust document IR as MDAST without giving remark syntax authority. |
+| [`@illusions-lab/mdi-export-profile`](./nodejs/packages/export-profile) | Configuration | Shared typed export profiles passed unchanged to Rust renderers. |
+| [`@illusions-lab/mdi-to-hast`](./nodejs/packages/to-hast) | HAST adapter | Exposes the Rust HTML representation as HAST for unified ecosystem consumers. |
+| [`@illusions-lab/mdi-to-html`](./nodejs/packages/to-html) | Renderer binding | Calls the Rust HTML and CSS renderer. |
+| [`@illusions-lab/mdi-to-pdf`](./nodejs/packages/to-pdf) | Renderer binding | Calls the Rust-controlled Chromium PDF pipeline. |
+| [`@illusions-lab/mdi-to-epub`](./nodejs/packages/to-epub) | Renderer binding | Calls the Rust EPUB renderer and packager. |
+| [`@illusions-lab/mdi-to-docx`](./nodejs/packages/to-docx) | Renderer binding | Calls the Rust DOCX renderer and OOXML packager. |
+| [`@illusions-lab/mdi-cli`](./nodejs/packages/cli) | CLI | `mdi build input.mdi --to html\|pdf\|epub\|docx` — command-line interface to the Rust-backed API. |
 
 ### Why this split / なぜこの分割か
 
-Three of the four output formats (HTML, PDF, EPUB) are HTML-family formats and share the same mdast → hast mapping (`@illusions-lab/mdi-to-hast`); only DOCX is genuine OOXML and bypasses hast entirely. See the [architecture notes](#architecture--アーキテクチャ) below.
+`mdi-core` owns meaning and deterministic output. Language packages only make
+that functionality natural to use in a host ecosystem: typed objects in
+JavaScript, MDAST/HAST for unified, Python objects through PyO3, and Swift
+types through UniFFI. This separation prevents the same syntax rule from
+acquiring different meanings in different languages.
 
-HTML・PDF・EPUB の 3 つは HTML 系フォーマットであり、同じ mdast → hast マッピング（`@illusions-lab/mdi-to-hast`）を共有します。DOCX のみ純粋な OOXML であり、hast を経由しません。詳細は下記アーキテクチャ節を参照してください。
+`mdi-core` が文書の意味と決定論的な出力を担い、各言語パッケージはその
+機能を JavaScript の型、unified の MDAST/HAST、PyO3、UniFFI など各環境に
+適した形で公開するだけです。これにより、同じ構文が言語ごとに異なる意味を
+持つことを防ぎます。
 
 ---
 
 ## Architecture / アーキテクチャ
 
+The architecture is deliberately simple: source enters Rust once, and all
+language packages consume the same versioned document IR. Deterministic
+renderers live in Rust. PDF uses HTML and print CSS generated by Rust, with
+Chromium launched and controlled by Rust.
+
 ```mermaid
 flowchart TD
-  micromark["micromark-extension-mdi"] --> mdastUtil["mdast-util-mdi"]
-  mdastUtil --> remark["@illusions-lab/mdi-remark"]
+  source[".mdi source"] --> core
+  subgraph rustCore["Rust — single executable authority"]
+    core["parser<br/>CommonMark · GFM · MDI · front matter"] --> ir["versioned MDI document IR"]
+    ir --> renderers["HTML · TXT · EPUB · DOCX · MDI"]
+    renderers --> chromium["Chromium orchestration"]
+  end
 
-  remark -->|MDI mdast tree| hast["@illusions-lab/mdi-to-hast"]
-  hast --> html["@illusions-lab/mdi-to-html"]
-  html --> pdf["@illusions-lab/mdi-to-pdf"]
-  hast --> epub["@illusions-lab/mdi-to-epub"]
-  remark -->|MDI mdast tree| docx["@illusions-lab/mdi-to-docx"]
+  subgraph bindings["Thin language bindings — no grammar rules"]
+    js["JavaScript / WASM"]
+    py["Python / PyO3"]
+    swift["Swift / UniFFI"]
+    ecosystem["mdast / remark adapters"]
+  end
 
-  classDef parser fill:#e8f0fe,stroke:#4285f4,color:#202124
-  classDef transform fill:#e6f4ea,stroke:#34a853,color:#202124
-  classDef converter fill:#fef7e0,stroke:#f9ab00,color:#202124
-  class micromark,mdastUtil,remark parser
-  class hast transform
-  class html,pdf,epub,docx converter
+  ir --> js
+  ir -.-> py
+  ir -.-> swift
+  ir -.-> ecosystem
+  chromium --> pdf["PDF bytes"]
+
+  classDef rustcore fill:#fde7e7,stroke:#ea4335,color:#202124
+  classDef binding fill:#f3e8fd,stroke:#a142f4,color:#202124
+  classDef output fill:#fef7e0,stroke:#f9ab00,color:#202124
+  class core,ir,renderers,chromium rustcore
+  class js,py,swift,ecosystem binding
+  class pdf output
 ```
 
-All converters consume the **same mdast tree** produced by `@illusions-lab/mdi-remark`, so editor-path and export-path behavior stay in sync (see [SYNTAX.md § Parsing Order](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md#parsing-order--パース順序)).
-
-すべてのコンバータは `@illusions-lab/mdi-remark` が生成する**単一の mdast ツリー**を消費するため、エディタ側とエクスポート側の挙動が分岐しません。
+The complete ownership rules, IR contract, parser invariants, and renderer
+boundaries are documented in [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
 ---
 
 ## Development / 開発
 
-This is a [pnpm](https://pnpm.io) + [Turborepo](https://turbo.build) monorepo
-with a Rust workspace for the language-neutral syntax core.
+`nodejs/` is a [pnpm](https://pnpm.io) + [Turborepo](https://turbo.build)
+monorepo; `mdi-core/` is an independent Cargo project.
 
 ```bash
+cd nodejs
 pnpm install
 pnpm build
 pnpm test
 ```
 
-`crates/mdi-core` implements the MDI-only grammar (escapes, grapheme-aware
-ruby, tate-chu-yoko, inline macros, and block macros) as a language-neutral
-AST. It is an internal workspace crate in this JavaScript-first release; the
-published Node.js API remains the existing micromark/remark integration. The
-canonical grammar and its versioned specification remain in
-[`illusions-lab/MDI`](https://github.com/illusions-lab/MDI), not in this
-repository. Native Node and Python bindings will consume this same core in
-later releases.
+```bash
+cd mdi-core
+cargo build
+cargo test
+```
+
+Rebuilding the wasm bridge needs a `wasm32-unknown-unknown` Rust target and
+`wasm-pack` in addition to the plain `cargo build`/`cargo test` toolchain
+above; `pnpm build` in `nodejs/` runs it as part of the normal workspace
+build.
 
 CI runs the Rust core natively on Linux, macOS, and Windows for both x64 and
-ARM64. The JavaScript integration suite (including Chromium PDF output) runs
-on Linux x64; platform-native bindings will use the same matrix when added.
+ARM64. The JavaScript integration suite, including Chromium PDF output, runs
+on Linux x64. Every language binding runs the shared parser, diagnostic, and
+renderer conformance fixtures.
 
 ### Versioning / バージョニング
 
-Every package's version is `<MDI spec version>.<package release number>` — the major.minor pair always equals the MDI spec version this repo targets (currently `2.0`), and the patch number is each package's own independent release count, **starting at `.1`** (never `.0`) for the first release under a given spec version. For example the first release under MDI 2.0 is `2.0.1`; a later fix to just `@illusions-lab/mdi-to-docx` might be `2.0.7` while `@illusions-lab/mdi-to-html` is still `2.0.3` — patch numbers are independent per package, only major.minor is shared.
+Every package's version is `<MDI spec version>.<package release number>` — the major.minor pair always equals the MDI spec version this repository implements (`2.0`), and the patch number is each package's own independent release count, **starting at `.1`** (never `.0`) for the first release under a given spec version. For example the first release under MDI 2.0 is `2.0.1`; a later fix to just `@illusions-lab/mdi-to-docx` might be `2.0.7` while `@illusions-lab/mdi-to-html` is still `2.0.3` — patch numbers are independent per package, only major.minor is shared.
 
 すべてのパッケージのバージョンは `<MDI 仕様バージョン>.<パッケージ自身のリリース回数>` です。major.minor はこのリポジトリが対応する MDI 仕様バージョン（現在 `2.0`）に常に一致し、patch は各パッケージが独自にカウントするリリース回数で、そのバージョンで最初のリリースは `.0` ではなく **`.1` から始まります**。例えば MDI 2.0 対応の初回リリースは `2.0.1`。以降、`@illusions-lab/mdi-to-docx` だけ修正を重ねて `2.0.7` になっても `@illusions-lab/mdi-to-html` は `2.0.3` のまま、というように patch は各パッケージ独立です。
 
@@ -94,6 +156,7 @@ Every package's version is `<MDI spec version>.<package release number>` — the
   **通常のリリース**（同じ仕様バージョン内）: 通常どおり Changesets を使い、常に **patch** bump のみを選びます（minor/major は使いません）。
 
   ```bash
+  cd nodejs
   pnpm changeset       # record what changed; always pick "patch"
   pnpm version         # apply pending changesets
   pnpm release         # build + publish
@@ -103,6 +166,7 @@ Every package's version is `<MDI spec version>.<package release number>` — the
   **仕様バージョンの引き上げ**（例: MDI 2.0 → 2.1）: Changesets は「MDI 仕様バージョン」という概念を知らないため、これは別の明示的な手順です。各パッケージの直前の patch 数に関係なく、全パッケージのバージョンを `<新しい仕様バージョン>.1` へ書き換えます。
 
   ```bash
+  cd nodejs
   pnpm bump-spec-version 2.1
   ```
 
@@ -110,11 +174,12 @@ Every package's version is `<MDI spec version>.<package release number>` — the
 
 ## Related projects / 関連プロジェクト
 
-- [illusions-lab/MDI](https://github.com/illusions-lab/MDI) — the MDI specification.
 - [illusions-lab/milkdown-mdi](https://github.com/illusions-lab/milkdown-mdi) — Milkdown editor plugins for MDI syntax support and vertical writing (縦書き) display.
 
 ---
 
 ## License
 
-MIT
+The Node.js tooling (`nodejs/`) and the Rust core (`mdi-core/`) are MIT — see [LICENSE](./LICENSE).
+
+The MDI specification ([`SYNTAX.md`](./SYNTAX.md)) is public domain — see [LICENSE-SPEC](./LICENSE-SPEC).

@@ -6,28 +6,46 @@ on:
   pull_request:
 
 jobs:
-  build:
+  nodejs:
+    name: Node.js
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nodejs
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy,rustfmt
+          targets: wasm32-unknown-unknown
+
+      - uses: jetli/wasm-pack-action@v0.4.0
 
       - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
+          cache-dependency-path: nodejs/pnpm-lock.yaml
 
       - run: pnpm install --frozen-lockfile
       # to-pdf's tests print through a real headless Chromium.
       - run: pnpm --filter @illusions-lab/mdi-to-pdf exec playwright install --with-deps chromium
       - run: pnpm typecheck
       - run: pnpm build
-      - run: pnpm test
+      - run: pnpm test:coverage
+
+      - name: Upload Node.js coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./nodejs/**/coverage/lcov.info
+          flags: nodejs
+          name: nodejs
+          fail_ci_if_error: false
 
   rust-native:
     name: Rust (${{ matrix.platform }})
@@ -48,6 +66,9 @@ jobs:
           - platform: Windows ARM64
             runner: windows-11-arm
     runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: mdi-core
     steps:
       - uses: actions/checkout@v4
 
@@ -55,7 +76,25 @@ jobs:
         with:
           components: clippy,rustfmt
 
-      - run: cargo test --workspace
+      - run: cargo test
 
       - if: matrix.platform == 'Linux x64'
-        run: cargo fmt --check && cargo clippy --workspace -- -D warnings
+        run: cargo fmt --check && cargo clippy -- -D warnings
+
+      - name: Install cargo-llvm-cov
+        if: matrix.platform == 'Linux x64'
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Generate Rust coverage report
+        if: matrix.platform == 'Linux x64'
+        run: cargo llvm-cov --locked --lcov --output-path lcov.info
+
+      - name: Upload Rust coverage to Codecov
+        if: matrix.platform == 'Linux x64'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./mdi-core/lcov.info
+          flags: rust
+          name: rust
+          fail_ci_if_error: false

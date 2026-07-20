@@ -1,0 +1,40 @@
+---
+title: MDI
+description: Rust-powered tooling for illusion Markdown (MDI) — one parser and consistent output across every platform.
+template: splash
+hero:
+  tagline: One Rust parser for illusion Markdown (MDI), with consistent HTML, PDF, EPUB, DOCX, and text output.
+  actions:
+    - text: Getting Started
+      link: /MDI/guides/getting-started/
+      icon: right-arrow
+    - text: MDI 2.0 Specification
+      link: https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+	<Card title="One source of truth" icon="seti:rust">
+		`mdi-core` parses CommonMark, GFM, front matter, and every MDI
+		construct into one versioned document IR. Every binding and renderer
+		observes the same syntax decisions.
+	</Card>
+	<Card title="Japanese typography, for real" icon="translate">
+		Ruby (ルビ), tate-chu-yoko (縦中横), boten (傍点), warichu
+		(割注), kerning, and vertical writing — parsed as first-class syntax,
+		not post-processing hacks. See the [live showcase](/MDI/syntax/showcase/):
+		this site renders MDI with its own parser.
+	</Card>
+	<Card title="Thin language interfaces" icon="puzzle">
+		JavaScript, Python, and Swift expose the same Rust API without carrying
+		another tokenizer. A remark adapter is available when a unified pipeline
+		needs mdast.
+	</Card>
+	<Card title="CLI included" icon="seti:shell">
+		`mdi build novel.mdi --to pdf` — one command from manuscript to a
+		Rust-controlled Chromium PDF pipeline.
+	</Card>
+</CardGrid>

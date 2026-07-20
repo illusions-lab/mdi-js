@@ -1,0 +1,974 @@
+//! The language-neutral MDI 2.0 syntax core.
+//!
+//! This crate deliberately parses only MDI constructs.  CommonMark and GFM
+//! remain the responsibility of a host integration (for example `remark` in
+//! JavaScript).  Keeping that boundary here makes the grammar reusable from
+//! native bindings and WebAssembly without coupling it to one Markdown AST.
+
+use serde::{Serialize, Serializer, ser::SerializeStruct};
+use unicode_segmentation::UnicodeSegmentation;
+
+/// MDI syntax version implemented by this crate.
+pub const MDI_SPEC_VERSION: &str = "2.0";
+
+/// Version of the language-neutral wire format returned by the bindings.
+///
+/// `0.x` is intentional while the document model is expanded from the
+/// transitional MDI-only parser to the full CommonMark/GFM/MDI parser.
+pub const MDI_IR_VERSION: &str = "0.1";
+
+/// A binding-friendly parse envelope.
+///
+/// Capabilities make the current migration boundary explicit: consumers can
+/// use the Rust-owned MDI syntax tree today without mistaking it for the final
+/// whole-document CommonMark parser.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ParseOutput {
+    pub ir_version: &'static str,
+    pub syntax_version: &'static str,
+    pub capabilities: ParserCapabilities,
+    pub document: Document,
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+/// Parser features represented in a [`ParseOutput`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ParserCapabilities {
+    pub mdi: bool,
+    pub common_mark: bool,
+    pub gfm: bool,
+    pub front_matter: bool,
+    pub source_spans: bool,
+}
+
+/// A recoverable parser message. The transitional parser currently emits no
+/// diagnostics, but the field is part of the wire contract from stage 1.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Diagnostic {
+    pub severity: DiagnosticSeverity,
+    pub code: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub span: Option<SourceSpan>,
+}
+
+/// Severity of a parser diagnostic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DiagnosticSeverity {
+    Warning,
+    Error,
+}
+
+/// Half-open UTF-8 byte range in the original source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceSpan {
+    pub start_byte: u32,
+    pub end_byte: u32,
+}
+
+/// A document split into MDI-relevant block boundaries.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Document {
+    pub blocks: Vec<Block>,
+}
+
+/// A block-level MDI construct or ordinary source line.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum Block {
+    Paragraph {
+        inlines: Vec<Inline>,
+        indent: Option<u32>,
+        bottom: Option<u32>,
+    },
+    Blank,
+    Pagebreak {
+        variant: Option<PagebreakVariant>,
+    },
+}
+
+/// A page-break side.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PagebreakVariant {
+    Left,
+    Right,
+}
+
+/// A language-neutral MDI inline AST.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Inline {
+    Text(String),
+    Ruby {
+        base: String,
+        ruby: RubyReading,
+    },
+    Tcy(String),
+    Break,
+    Em {
+        mark: String,
+        children: Vec<Inline>,
+    },
+    NoBreak(Vec<Inline>),
+    Warichu(Vec<Inline>),
+    Kern {
+        amount: String,
+        children: Vec<Inline>,
+    },
+}
+
+/// Keep the public wire nodes flat (`{ type, value }`, `{ type, children }`,
+/// and so on) without forcing the Rust implementation to use struct variants
+/// internally. This shape maps naturally to discriminated unions in every
+/// host language.
+impl Serialize for Inline {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Text(value) => {
+                let mut node = serializer.serialize_struct("Inline", 2)?;
+                node.serialize_field("type", "text")?;
+                node.serialize_field("value", value)?;
+                node.end()
+            }
+            Self::Ruby { base, ruby } => {
+                let mut node = serializer.serialize_struct("Inline", 3)?;
+                node.serialize_field("type", "ruby")?;
+                node.serialize_field("base", base)?;
+                node.serialize_field("ruby", ruby)?;
+                node.end()
+            }
+            Self::Tcy(value) => {
+                let mut node = serializer.serialize_struct("Inline", 2)?;
+                node.serialize_field("type", "tcy")?;
+                node.serialize_field("value", value)?;
+                node.end()
+            }
+            Self::Break => {
+                let mut node = serializer.serialize_struct("Inline", 1)?;
+                node.serialize_field("type", "break")?;
+                node.end()
+            }
+            Self::Em { mark, children } => {
+                let mut node = serializer.serialize_struct("Inline", 3)?;
+                node.serialize_field("type", "em")?;
+                node.serialize_field("mark", mark)?;
+                node.serialize_field("children", children)?;
+                node.end()
+            }
+            Self::NoBreak(children) => {
+                let mut node = serializer.serialize_struct("Inline", 2)?;
+                node.serialize_field("type", "noBreak")?;
+                node.serialize_field("children", children)?;
+                node.end()
+            }
+            Self::Warichu(children) => {
+                let mut node = serializer.serialize_struct("Inline", 2)?;
+                node.serialize_field("type", "warichu")?;
+                node.serialize_field("children", children)?;
+                node.end()
+            }
+            Self::Kern { amount, children } => {
+                let mut node = serializer.serialize_struct("Inline", 3)?;
+                node.serialize_field("type", "kern")?;
+                node.serialize_field("amount", amount)?;
+                node.serialize_field("children", children)?;
+                node.end()
+            }
+        }
+    }
+}
+
+/// The reading attached to a ruby base.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "type", content = "value", rename_all = "camelCase")]
+pub enum RubyReading {
+    Group(String),
+    Split(Vec<String>),
+}
+
+/// Parse a source document into MDI constructs.  Non-MDI Markdown is retained
+/// as text for the host Markdown parser to interpret.
+pub fn parse(source: &str) -> Document {
+    let mut blocks = Vec::new();
+    let mut pending: Option<PendingBlock> = None;
+
+    for line in source.lines() {
+        if is_blank_marker(line) {
+            flush_pending(&mut blocks, &mut pending);
+            blocks.push(Block::Blank);
+            continue;
+        }
+        if let Some(pagebreak) = pagebreak(line) {
+            flush_pending(&mut blocks, &mut pending);
+            blocks.push(Block::Pagebreak { variant: pagebreak });
+            continue;
+        }
+        if let Some(marker) = pending_block(line) {
+            if pending.is_some() {
+                flush_pending(&mut blocks, &mut pending);
+                blocks.push(paragraph(line, None));
+            } else {
+                pending = Some(marker);
+            }
+            continue;
+        }
+
+        blocks.push(paragraph(line, pending.take()));
+    }
+    flush_pending(&mut blocks, &mut pending);
+    Document { blocks }
+}
+
+/// Parse with the stage-1 Rust syntax parser and return the versioned wire
+/// envelope used by language bindings.
+pub fn parse_output(source: &str) -> ParseOutput {
+    ParseOutput {
+        ir_version: MDI_IR_VERSION,
+        syntax_version: MDI_SPEC_VERSION,
+        capabilities: ParserCapabilities {
+            mdi: true,
+            common_mark: false,
+            gfm: false,
+            front_matter: false,
+            source_spans: false,
+        },
+        document: parse(source),
+        diagnostics: Vec::new(),
+    }
+}
+
+/// Serialize [`parse_output`] for FFI boundaries.
+///
+/// JSON is the first portable contract because it behaves identically through
+/// WebAssembly, N-API, PyO3, and a C ABI. Native bindings may later provide
+/// zero-copy views without changing this wire representation.
+pub fn parse_json(source: &str) -> String {
+    serde_json::to_string(&parse_output(source))
+        .expect("serializing the MDI parse output cannot fail")
+}
+
+/// Parse MDI inline syntax while keeping all other text literal.
+pub fn parse_inlines(source: &str) -> Vec<Inline> {
+    let mut out = Vec::new();
+    let mut text = String::new();
+    let mut index = 0;
+
+    while index < source.len() {
+        let rest = &source[index..];
+        if rest.starts_with('\\') {
+            let mut chars = rest.chars();
+            let slash = chars.next().expect("prefix was checked");
+            let Some(next) = chars.next() else {
+                text.push(slash);
+                index += slash.len_utf8();
+                continue;
+            };
+            if is_escapable(next) {
+                text.push(next);
+            } else {
+                text.push(slash);
+                text.push(next);
+            }
+            index += slash.len_utf8() + next.len_utf8();
+            continue;
+        }
+        if let Some((inline, consumed)) = ruby(rest) {
+            push_text(&mut out, &mut text);
+            out.push(inline);
+            index += consumed;
+            continue;
+        }
+        if let Some((inline, consumed)) = tcy(rest) {
+            push_text(&mut out, &mut text);
+            out.push(inline);
+            index += consumed;
+            continue;
+        }
+        if let Some((inline, consumed)) = boten(rest) {
+            push_text(&mut out, &mut text);
+            out.push(inline);
+            index += consumed;
+            continue;
+        }
+        if let Some((inline, consumed)) = bracket_macro(rest) {
+            push_text(&mut out, &mut text);
+            out.push(inline);
+            index += consumed;
+            continue;
+        }
+        let character = rest.chars().next().expect("index is in bounds");
+        text.push(character);
+        index += character.len_utf8();
+    }
+    push_text(&mut out, &mut text);
+    out
+}
+
+#[derive(Clone)]
+enum PendingBlock {
+    Indent { amount: u32, source: String },
+    Bottom { amount: u32, source: String },
+}
+
+fn paragraph(line: &str, pending: Option<PendingBlock>) -> Block {
+    let (indent, bottom) = match pending {
+        Some(PendingBlock::Indent { amount, .. }) => (Some(amount), None),
+        Some(PendingBlock::Bottom { amount, .. }) => (None, Some(amount)),
+        None => (None, None),
+    };
+    Block::Paragraph {
+        inlines: parse_inlines(line),
+        indent,
+        bottom,
+    }
+}
+
+fn flush_pending(blocks: &mut Vec<Block>, pending: &mut Option<PendingBlock>) {
+    if let Some(marker) = pending.take() {
+        // As in the micromark adapter, an alignment macro without a following
+        // eligible block remains literal source.
+        let source = match marker {
+            PendingBlock::Indent { source, .. } | PendingBlock::Bottom { source, .. } => source,
+        };
+        blocks.push(paragraph(&source, None));
+    }
+}
+
+fn is_blank_marker(line: &str) -> bool {
+    let value = line.trim_end_matches([' ', '\t']);
+    value == "\\" || value == "<br>" || value == "<br />" || value == "[[blank]]"
+}
+
+fn pagebreak(line: &str) -> Option<Option<PagebreakVariant>> {
+    match line.trim() {
+        "[[pagebreak]]" => Some(None),
+        "[[pagebreak:left]]" => Some(Some(PagebreakVariant::Left)),
+        "[[pagebreak:right]]" => Some(Some(PagebreakVariant::Right)),
+        _ => None,
+    }
+}
+
+fn pending_block(line: &str) -> Option<PendingBlock> {
+    let value = line.trim();
+    if value == "[[bottom]]" {
+        return Some(PendingBlock::Bottom {
+            amount: 0,
+            source: value.to_owned(),
+        });
+    }
+    let (kind, amount) = value
+        .strip_prefix("[[")?
+        .strip_suffix("]]")?
+        .split_once(':')?;
+    if amount.is_empty()
+        || amount.starts_with('0')
+        || !amount.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    let amount = amount.parse().ok()?;
+    match kind {
+        "indent" => Some(PendingBlock::Indent {
+            amount,
+            source: value.to_owned(),
+        }),
+        "bottom" => Some(PendingBlock::Bottom {
+            amount,
+            source: value.to_owned(),
+        }),
+        _ => None,
+    }
+}
+
+fn ruby(value: &str) -> Option<(Inline, usize)> {
+    if !value.starts_with('{') {
+        return None;
+    }
+    let end = close_unescaped(value, 1, '}')?;
+    let body = &value[1..end];
+    let separator = bare_index(body, '|')?;
+    let base = unescape_ruby(&body[..separator]);
+    let raw_ruby = &body[separator + 1..];
+    let ruby = split_ruby(&base, raw_ruby);
+    Some((Inline::Ruby { base, ruby }, end + 1))
+}
+
+fn split_ruby(base: &str, raw: &str) -> RubyReading {
+    let segments = split_unescaped(raw, '.');
+    if segments.len() == 1 {
+        return RubyReading::Group(unescape_ruby(raw));
+    }
+    let segments: Vec<String> = segments.into_iter().map(unescape_ruby).collect();
+    if segments.len() == base.graphemes(true).count()
+        && segments.iter().all(|part| !part.is_empty())
+    {
+        RubyReading::Split(segments)
+    } else {
+        RubyReading::Group(segments.concat())
+    }
+}
+
+fn tcy(value: &str) -> Option<(Inline, usize)> {
+    if !value.starts_with('^') {
+        return None;
+    }
+    let closing = value[1..].find('^')? + 1;
+    let body = &value[1..closing];
+    if body.is_empty()
+        || body.chars().count() > 6
+        || !body
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '!' || c == '?')
+    {
+        return None;
+    }
+    Some((Inline::Tcy(body.to_owned()), closing + 1))
+}
+
+fn boten(value: &str) -> Option<(Inline, usize)> {
+    let prefix = "《《";
+    if !value.starts_with(prefix) {
+        return None;
+    }
+    let end = value.find("》》")?;
+    let body = &value[prefix.len()..end];
+    if body.is_empty()
+        || body.contains('\n')
+        || contains_unescaped(body, '《')
+        || contains_unescaped(body, '》')
+    {
+        return None;
+    }
+    Some((
+        Inline::Em {
+            mark: "﹅".to_owned(),
+            children: vec![Inline::Text(unescape_mdi(body))],
+        },
+        end + "》》".len(),
+    ))
+}
+
+fn bracket_macro(value: &str) -> Option<(Inline, usize)> {
+    if !value.starts_with("[[") {
+        return None;
+    }
+    if value.starts_with("[[br]]") {
+        return Some((Inline::Break, "[[br]]".len()));
+    }
+    let end = close_macro(value)?;
+    let body = &value[2..end];
+    let (name, payload) = body.split_once(':')?;
+    let children = |content: &str| parse_inlines(content);
+    let inline = match name {
+        "no-break" if !payload.is_empty() => Inline::NoBreak(children(payload)),
+        "warichu" => Inline::Warichu(children(payload)),
+        "kern" => {
+            let (amount, content) = payload.split_once(':')?;
+            if !valid_kern(amount) {
+                return None;
+            }
+            Inline::Kern {
+                amount: unescape_mdi(amount),
+                children: children(content),
+            }
+        }
+        "em" => {
+            let (mark, content) = match bare_index(payload, ':') {
+                Some(index) => {
+                    let candidate = unescape_mdi(&payload[..index]);
+                    if candidate.graphemes(true).count() == 1
+                        && !candidate
+                            .chars()
+                            .any(|c| c.is_whitespace() || c.is_control())
+                    {
+                        (candidate, &payload[index + 1..])
+                    } else {
+                        ("﹅".to_owned(), payload)
+                    }
+                }
+                None => ("﹅".to_owned(), payload),
+            };
+            Inline::Em {
+                mark,
+                children: children(content),
+            }
+        }
+        _ => return None,
+    };
+    Some((inline, end + 2))
+}
+
+fn close_macro(value: &str) -> Option<usize> {
+    let mut index = 2;
+    let mut depth = 1;
+    while index < value.len() {
+        let rest = &value[index..];
+        if rest.starts_with('\\') {
+            index += rest.chars().nth(1)?.len_utf8() + 1;
+        } else if rest.starts_with("[[") {
+            depth += 1;
+            index += 2;
+        } else if rest.starts_with("]]") {
+            depth -= 1;
+            if depth == 0 {
+                return Some(index);
+            }
+            index += 2;
+        } else {
+            index += rest.chars().next()?.len_utf8();
+        }
+    }
+    None
+}
+
+fn valid_kern(value: &str) -> bool {
+    let value = value.strip_suffix("em").unwrap_or("");
+    let value = value.strip_prefix(['+', '-']).unwrap_or(value);
+    let mut parts = value.split('.');
+    let whole = parts.next().unwrap_or("");
+    let fraction = parts.next();
+    parts.next().is_none()
+        && !whole.is_empty()
+        && whole.bytes().all(|b| b.is_ascii_digit())
+        && fraction.is_none_or(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()))
+}
+
+fn close_unescaped(value: &str, start: usize, needle: char) -> Option<usize> {
+    let mut escaped = false;
+    for (index, character) in value[start..].char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if character == '\\' {
+            escaped = true;
+            continue;
+        }
+        if character == needle {
+            return Some(start + index);
+        }
+        if character == '\n' {
+            return None;
+        }
+    }
+    None
+}
+
+fn bare_index(value: &str, needle: char) -> Option<usize> {
+    let mut escaped = false;
+    for (index, character) in value.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if character == '\\' {
+            escaped = true;
+            continue;
+        }
+        if character == needle {
+            return Some(index);
+        }
+    }
+    None
+}
+
+fn contains_unescaped(value: &str, needle: char) -> bool {
+    bare_index(value, needle).is_some()
+}
+
+fn split_unescaped(value: &str, separator: char) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut start = 0;
+    let mut escaped = false;
+    for (index, character) in value.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if character == '\\' {
+            escaped = true;
+            continue;
+        }
+        if character == separator {
+            parts.push(&value[start..index]);
+            start = index + character.len_utf8();
+        }
+    }
+    parts.push(&value[start..]);
+    parts
+}
+
+/// SYNTAX.md §13's delimiter set, plus `\\` itself — CommonMark treats
+/// backslash as ordinary escapable ASCII punctuation, and JS's
+/// `unescapeMdi`/`unescapeRubyText` follow suit (`\\` -> `\`), so the Rust
+/// core must too or `\\` is left as two literal characters instead of one.
+const ESCAPABLE_MDI: &str = "{}|^[]:《》\\";
+const ESCAPABLE_RUBY: &str = "{}|^[]:《》\\.";
+
+fn unescape_mdi(value: &str) -> String {
+    unescape(value, ESCAPABLE_MDI)
+}
+
+fn unescape_ruby(value: &str) -> String {
+    unescape(value, ESCAPABLE_RUBY)
+}
+
+fn unescape(value: &str, allowed: &str) -> String {
+    let mut out = String::new();
+    let mut chars = value.chars();
+    while let Some(character) = chars.next() {
+        if character == '\\' {
+            if let Some(next) = chars.next() {
+                if allowed.contains(next) {
+                    out.push(next);
+                } else {
+                    out.push(character);
+                    out.push(next);
+                }
+            } else {
+                out.push(character);
+            }
+        } else {
+            out.push(character);
+        }
+    }
+    out
+}
+
+fn is_escapable(character: char) -> bool {
+    ESCAPABLE_MDI.contains(character)
+}
+
+fn push_text(out: &mut Vec<Inline>, text: &mut String) {
+    if !text.is_empty() {
+        out.push(Inline::Text(std::mem::take(text)));
+    }
+}
+
+/// A single `[[indent:N]]` / `[[bottom]]` / `[[pagebreak…]]` token's source,
+/// classified the same way as `mdast-util-mdi`'s `parseBlockMacro` (from
+/// which this was ported): trims the token source once, then matches the
+/// fixed pagebreak/bottom spellings before falling back to the generic
+/// `name:digits` form. Kept separate from `pending_block`/`pagebreak`
+/// above, which classify whole *lines* mid-scan rather than one already
+/// isolated token.
+#[cfg_attr(not(feature = "wasm"), allow(dead_code))]
+enum BlockMacroClass {
+    Indent(u32),
+    Bottom(u32),
+    Pagebreak(Option<PagebreakVariant>),
+    Literal,
+}
+
+#[cfg_attr(not(feature = "wasm"), allow(dead_code))]
+fn classify_block_macro(source: &str) -> BlockMacroClass {
+    let value = source.trim();
+    match value {
+        "[[pagebreak:right]]" => return BlockMacroClass::Pagebreak(Some(PagebreakVariant::Right)),
+        "[[pagebreak:left]]" => return BlockMacroClass::Pagebreak(Some(PagebreakVariant::Left)),
+        "[[pagebreak]]" => return BlockMacroClass::Pagebreak(None),
+        "[[bottom]]" => return BlockMacroClass::Bottom(0),
+        _ => {}
+    }
+    if let Some((kind, amount)) = value
+        .strip_prefix("[[")
+        .and_then(|rest| rest.strip_suffix("]]"))
+        .and_then(|inner| inner.split_once(':'))
+    {
+        let valid_amount = !amount.is_empty()
+            && !amount.starts_with('0')
+            && amount.bytes().all(|b| b.is_ascii_digit());
+        if valid_amount && let Ok(amount) = amount.parse::<u32>() {
+            match kind {
+                "indent" => return BlockMacroClass::Indent(amount),
+                "bottom" => return BlockMacroClass::Bottom(amount),
+                _ => {}
+            }
+        }
+    }
+    BlockMacroClass::Literal
+}
+
+/// wasm-bindgen bindings for the stage-1 JavaScript interface and the legacy
+/// semantic helpers still consumed by the differential-test pipeline.
+#[cfg(feature = "wasm")]
+mod wasm {
+    use super::{
+        BlockMacroClass, PagebreakVariant, RubyReading, classify_block_macro, parse_json,
+        split_ruby, unescape_mdi, unescape_ruby,
+    };
+    use wasm_bindgen::prelude::*;
+
+    /// Parse with Rust and return the versioned MDI IR as JSON.
+    ///
+    /// The JavaScript package parses this string and performs no syntax work.
+    #[wasm_bindgen(js_name = parseMdiSyntaxJson)]
+    pub fn wasm_parse_mdi_syntax_json(source: &str) -> String {
+        parse_json(source)
+    }
+
+    #[wasm_bindgen(js_name = unescapeMdi)]
+    pub fn wasm_unescape_mdi(value: &str) -> String {
+        unescape_mdi(value)
+    }
+
+    #[wasm_bindgen(js_name = unescapeRubyText)]
+    pub fn wasm_unescape_ruby(value: &str) -> String {
+        unescape_ruby(value)
+    }
+
+    /// Mirrors `resolveRuby(base, rawRuby): string | string[]`.
+    #[wasm_bindgen(js_name = resolveRuby)]
+    pub fn wasm_resolve_ruby(base: &str, raw_ruby: &str) -> JsValue {
+        match split_ruby(base, raw_ruby) {
+            RubyReading::Group(value) => JsValue::from_str(&value),
+            RubyReading::Split(parts) => {
+                let array = js_sys::Array::new();
+                for part in parts {
+                    array.push(&JsValue::from_str(&part));
+                }
+                array.into()
+            }
+        }
+    }
+
+    #[wasm_bindgen(js_name = blockMacroKind)]
+    pub fn wasm_block_macro_kind(source: &str) -> String {
+        match classify_block_macro(source) {
+            BlockMacroClass::Indent(_) => "indent",
+            BlockMacroClass::Bottom(_) => "bottom",
+            BlockMacroClass::Pagebreak(_) => "pagebreak",
+            BlockMacroClass::Literal => "literal",
+        }
+        .to_owned()
+    }
+
+    /// -1 when the token has no amount (pagebreak / literal).
+    #[wasm_bindgen(js_name = blockMacroAmount)]
+    pub fn wasm_block_macro_amount(source: &str) -> i32 {
+        match classify_block_macro(source) {
+            BlockMacroClass::Indent(amount) | BlockMacroClass::Bottom(amount) => amount as i32,
+            BlockMacroClass::Pagebreak(_) | BlockMacroClass::Literal => -1,
+        }
+    }
+
+    /// `"left"` / `"right"` / `""` (no variant, including non-pagebreak kinds).
+    #[wasm_bindgen(js_name = blockMacroVariant)]
+    pub fn wasm_block_macro_variant(source: &str) -> String {
+        match classify_block_macro(source) {
+            BlockMacroClass::Pagebreak(Some(PagebreakVariant::Left)) => "left",
+            BlockMacroClass::Pagebreak(Some(PagebreakVariant::Right)) => "right",
+            _ => "",
+        }
+        .to_owned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_ruby_and_split_ruby() {
+        assert_eq!(
+            parse_inlines("{東京|とう.きょう}"),
+            vec![Inline::Ruby {
+                base: "東京".into(),
+                ruby: RubyReading::Split(vec!["とう".into(), "きょう".into()]),
+            }]
+        );
+        assert_eq!(
+            parse_inlines("{東京|.きょう}"),
+            vec![Inline::Ruby {
+                base: "東京".into(),
+                ruby: RubyReading::Group("きょう".into()),
+            }]
+        );
+    }
+
+    #[test]
+    fn parses_nested_macros_and_escapes() {
+        assert_eq!(
+            parse_inlines("[[em:●:a[[no-break:b]]]]"),
+            vec![Inline::Em {
+                mark: "●".into(),
+                children: vec![
+                    Inline::Text("a".into()),
+                    Inline::NoBreak(vec![Inline::Text("b".into())])
+                ],
+            }]
+        );
+    }
+
+    #[test]
+    fn parses_tcy_and_boten() {
+        assert_eq!(
+            parse_inlines("第^12^話《《重要》》"),
+            vec![
+                Inline::Text("第".into()),
+                Inline::Tcy("12".into()),
+                Inline::Text("話".into()),
+                Inline::Em {
+                    mark: "﹅".into(),
+                    children: vec![Inline::Text("重要".into())]
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn recognises_block_macros() {
+        assert_eq!(
+            parse("[[indent:2]]\n本文\n[[pagebreak:left]]\n\\"),
+            Document {
+                blocks: vec![
+                    Block::Paragraph {
+                        inlines: vec![Inline::Text("本文".into())],
+                        indent: Some(2),
+                        bottom: None
+                    },
+                    Block::Pagebreak {
+                        variant: Some(PagebreakVariant::Left)
+                    },
+                    Block::Blank,
+                ]
+            }
+        );
+    }
+
+    #[test]
+    fn keeps_invalid_syntax_literal() {
+        assert_eq!(
+            parse_inlines("{plain} ^_^ [[kern:wide:text]] [[no-break:]]"),
+            vec![Inline::Text(
+                "{plain} ^_^ [[kern:wide:text]] [[no-break:]]".into()
+            )]
+        );
+    }
+
+    #[test]
+    fn applies_mdi_escapes_once_before_recognition() {
+        assert_eq!(
+            parse_inlines(r"\{東京\|とうきょう\} \^12\^ \[\[br\]\] \《《文字\》》"),
+            vec![Inline::Text(
+                "{東京|とうきょう} ^12^ [[br]] 《《文字》》".into()
+            )]
+        );
+    }
+
+    #[test]
+    fn unescapes_backslash_itself_but_leaves_non_escapable_pairs_alone() {
+        assert_eq!(
+            parse_inlines(r"\\ \n \a \0 \-"),
+            vec![Inline::Text(r"\ \n \a \0 \-".into())]
+        );
+    }
+
+    #[test]
+    fn treats_boten_alias_content_as_plain_text() {
+        assert_eq!(
+            parse_inlines(r"《《a\《b》》"),
+            vec![Inline::Em {
+                mark: "﹅".into(),
+                children: vec![Inline::Text("a《b".into())]
+            }]
+        );
+        assert_eq!(
+            parse_inlines("《《雪》考》"),
+            vec![Inline::Text("《《雪》考》".into())]
+        );
+    }
+
+    #[test]
+    fn falls_back_to_default_boten_mark_for_invalid_mark_parameter() {
+        assert_eq!(
+            parse_inlines("[[em:ab:cd]]"),
+            vec![Inline::Em {
+                mark: "﹅".into(),
+                children: vec![Inline::Text("ab:cd".into())]
+            }]
+        );
+    }
+
+    #[test]
+    fn counts_extended_graphemes_for_split_ruby() {
+        assert_eq!(
+            parse_inlines("{𠮟る|しか.る}"),
+            vec![Inline::Ruby {
+                base: "𠮟る".into(),
+                ruby: RubyReading::Split(vec!["しか".into(), "る".into()])
+            }]
+        );
+        assert_eq!(
+            parse_inlines("{👨‍👩‍👧|かぞく}"),
+            vec![Inline::Ruby {
+                base: "👨‍👩‍👧".into(),
+                ruby: RubyReading::Group("かぞく".into())
+            }]
+        );
+    }
+
+    #[test]
+    fn leaves_unattached_or_stacked_block_macros_literal() {
+        assert_eq!(
+            parse("[[indent:2]]"),
+            Document {
+                blocks: vec![Block::Paragraph {
+                    inlines: vec![Inline::Text("[[indent:2]]".into())],
+                    indent: None,
+                    bottom: None
+                }]
+            }
+        );
+        assert_eq!(
+            parse("[[indent:2]]\n[[bottom]]\n本文"),
+            Document {
+                blocks: vec![
+                    Block::Paragraph {
+                        inlines: vec![Inline::Text("[[indent:2]]".into())],
+                        indent: None,
+                        bottom: None
+                    },
+                    Block::Paragraph {
+                        inlines: vec![Inline::Text("[[bottom]]".into())],
+                        indent: None,
+                        bottom: None
+                    },
+                    Block::Paragraph {
+                        inlines: vec![Inline::Text("本文".into())],
+                        indent: None,
+                        bottom: None
+                    }
+                ]
+            }
+        );
+    }
+
+    #[test]
+    fn serializes_the_versioned_binding_contract() {
+        let value: serde_json::Value =
+            serde_json::from_str(&parse_json("[[indent:2]]\n第^12^話\n[[pagebreak:right]]"))
+                .expect("parse output is valid JSON");
+
+        assert_eq!(value["irVersion"], "0.1");
+        assert_eq!(value["syntaxVersion"], "2.0");
+        assert_eq!(value["capabilities"]["mdi"], true);
+        assert_eq!(value["capabilities"]["commonMark"], false);
+        assert_eq!(value["capabilities"]["sourceSpans"], false);
+        assert_eq!(value["diagnostics"], serde_json::json!([]));
+        assert_eq!(value["document"]["blocks"][0]["type"], "paragraph");
+        assert_eq!(value["document"]["blocks"][0]["indent"], 2);
+        assert_eq!(value["document"]["blocks"][0]["inlines"][1]["type"], "tcy");
+        assert_eq!(value["document"]["blocks"][1]["type"], "pagebreak");
+        assert_eq!(value["document"]["blocks"][1]["variant"], "right");
+    }
+}
