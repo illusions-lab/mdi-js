@@ -1,24 +1,24 @@
 import JSZip from "jszip";
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
-import { unified } from "unified";
-import remarkParse from "remark-parse";
-import remarkMdi from "@illusions-lab/mdi-remark";
 import type { Root } from "mdast";
 import { mdiToEpub } from "./index.js";
 
+const require = createRequire(import.meta.url);
+const { parse: parseMdi, toPublicationMdast } = require("../../mdi/dist/index.cjs") as {
+  parse(source: string): { document: unknown };
+  toPublicationMdast(document: unknown): Root;
+};
+
 function parse(source: string): Root {
-  const p = unified().use(remarkParse).use(remarkMdi);
-  return p.runSync(p.parse(source)) as Root;
+  return toPublicationMdast(parseMdi(source).document);
 }
 
 describe("mdiToEpub", () =>
   it("packages pagebreak segments as EPUB spine chapters", async () => {
-    const p = unified().use(remarkParse).use(remarkMdi);
     const zip = await JSZip.loadAsync(
       await mdiToEpub(
-        p.runSync(
-          p.parse("---\ntitle: Test\n---\none\n\n[[pagebreak]]\n\ntwo")
-        ) as Root
+        parse("---\ntitle: Test\n---\none\n\n[[pagebreak]]\n\ntwo")
       )
     );
     expect(await zip.file("mimetype")!.async("string")).toBe(

@@ -8,6 +8,12 @@ export type PageNumberPosition =
   | "bottom-center"
   | "bottom-right";
 export type ChapterSplitLevel = "h1" | "h2" | "h3" | "none";
+/**
+ * `strict` makes the character and line counts the physical page contract.
+ * `typographic` instead gives an explicit point size and line-spacing
+ * multiplier precedence over that contract.
+ */
+export type GridMode = "strict" | "typographic";
 
 export interface Margins {
   top: number;
@@ -30,6 +36,14 @@ export interface ExportProfile {
   typesetting?: {
     writingMode?: WritingMode;
     fontFamily?: string;
+    /** Body type size in points; requires `pagination.gridMode: "typographic"`. */
+    fontSize?: number;
+    /** @deprecated Use fontSize. Kept for JSON profiles written before 2.1. */
+    fontSizePt?: number;
+    /** Baseline multiplier; requires `pagination.gridMode: "typographic"`. */
+    lineSpacing?: number;
+    /** @deprecated Use lineSpacing. */
+    lineHeight?: number;
     textIndentEm?: number;
     fullwidthSpaceIndent?: boolean;
   };
@@ -38,6 +52,12 @@ export interface ExportProfile {
     landscape?: boolean;
     charactersPerLine?: number;
     linesPerPage?: number;
+    /**
+     * Publisher manuscript grid policy. In strict mode, a point size or
+     * line-spacing override is rejected rather than silently changing the
+     * promised characters × lines page.
+     */
+    gridMode?: GridMode;
     margins?: Partial<Margins>;
     pageNumbers?: {
       enabled?: boolean;
@@ -58,12 +78,22 @@ export interface ExportProfile {
 
 export interface ResolvedExportProfile {
   metadata: ExportMetadata;
-  typesetting: Required<NonNullable<ExportProfile["typesetting"]>>;
+  typesetting: {
+    writingMode: WritingMode;
+    fontFamily: string;
+    /** Explicit body size in points in typographic mode; undefined preserves the grid. */
+    fontSize?: number;
+    /** Explicit baseline multiplier in typographic mode; undefined preserves the grid. */
+    lineSpacing?: number;
+    textIndentEm: number;
+    fullwidthSpaceIndent: boolean;
+  };
   pagination: {
     pageSize: PageSize;
     landscape: boolean;
     charactersPerLine: number;
     linesPerPage: number;
+    gridMode: GridMode;
     margins: Margins;
     pageNumbers: {
       enabled: boolean;
@@ -153,6 +183,8 @@ export const DEFAULT_EXPORT_PROFILE: ResolvedExportProfile = {
   typesetting: {
     writingMode: "horizontal",
     fontFamily: "serif",
+    fontSize: undefined,
+    lineSpacing: undefined,
     textIndentEm: 1,
     fullwidthSpaceIndent: false,
   },
@@ -160,9 +192,10 @@ export const DEFAULT_EXPORT_PROFILE: ResolvedExportProfile = {
     pageSize: "A4",
     landscape: false,
     charactersPerLine: 40,
-    linesPerPage: 34,
-    // Match Word's Normal preset: one inch on all sides.
-    margins: { top: 25.4, bottom: 25.4, left: 25.4, right: 25.4 },
+    linesPerPage: 30,
+    gridMode: "strict",
+    // Publisher manuscript baseline: 40 characters × 30 lines on A4.
+    margins: { top: 20, bottom: 20, left: 18, right: 18 },
     pageNumbers: { enabled: true, format: "simple", position: "bottom-center" },
   },
   epub: { chapterSplitLevel: "h1" },
@@ -210,6 +243,18 @@ export function resolveExportProfile(
     typeof typesetting.fontFamily !== "string"
   )
     throw new Error("fontFamily must be a string");
+  if (
+    typesetting.fontSize !== undefined &&
+    typesetting.fontSizePt !== undefined &&
+    typesetting.fontSize !== typesetting.fontSizePt
+  )
+    throw new Error("fontSize and fontSizePt must match when both are set");
+  if (
+    typesetting.lineSpacing !== undefined &&
+    typesetting.lineHeight !== undefined &&
+    typesetting.lineSpacing !== typesetting.lineHeight
+  )
+    throw new Error("lineSpacing and lineHeight must match when both are set");
   if (
     profile.epub?.coverPath !== undefined &&
     typeof profile.epub.coverPath !== "string"
@@ -266,36 +311,63 @@ export function resolveExportProfile(
       throw new Error(`${label} must be a boolean`);
     return value ?? fallback;
   };
+  // Keep the shared defaults physically valid for every declared paper size,
+  // including photo/card formats. A4 and larger retain the publisher baseline;
+  // only an omitted margin is reduced for a smaller sheet.
+  const dimensions = PAGE_DIMENSIONS[pageSize];
+  const pageWidth = pagination.landscape ? dimensions.height : dimensions.width;
+  const pageHeight = pagination.landscape ? dimensions.width : dimensions.height;
+  const defaultHorizontalMargin = Math.min(
+    DEFAULT_EXPORT_PROFILE.pagination.margins.left,
+    pageWidth * 0.1
+  );
+  const defaultVerticalMargin = Math.min(
+    DEFAULT_EXPORT_PROFILE.pagination.margins.top,
+    pageHeight * 0.1
+  );
   const resolvedMargins: Margins = {
     top: number(
       margins.top,
-      DEFAULT_EXPORT_PROFILE.pagination.margins.top,
+      defaultVerticalMargin,
       0,
       50,
       "top margin"
     ),
     bottom: number(
       margins.bottom,
-      DEFAULT_EXPORT_PROFILE.pagination.margins.bottom,
+      defaultVerticalMargin,
       0,
       50,
       "bottom margin"
     ),
     left: number(
       margins.left,
-      DEFAULT_EXPORT_PROFILE.pagination.margins.left,
+      defaultHorizontalMargin,
       0,
       50,
       "left margin"
     ),
     right: number(
       margins.right,
-      DEFAULT_EXPORT_PROFILE.pagination.margins.right,
+      defaultHorizontalMargin,
       0,
       50,
       "right margin"
     ),
   };
+  const fontSize = typesetting.fontSize ?? typesetting.fontSizePt;
+  const lineSpacing = typesetting.lineSpacing ?? typesetting.lineHeight;
+  const gridMode = pagination.gridMode ?? DEFAULT_EXPORT_PROFILE.pagination.gridMode;
+  if (gridMode !== "strict" && gridMode !== "typographic")
+    throw new Error("gridMode must be strict or typographic");
+  if (gridMode === "strict" && (fontSize !== undefined || lineSpacing !== undefined))
+    throw new Error(
+      "fontSize and lineSpacing require pagination.gridMode: typographic; strict grid preserves charactersPerLine × linesPerPage"
+    );
+  if (resolvedMargins.left + resolvedMargins.right >= pageWidth)
+    throw new Error("left and right margins must leave printable page width");
+  if (resolvedMargins.top + resolvedMargins.bottom >= pageHeight)
+    throw new Error("top and bottom margins must leave printable page height");
   return {
     metadata: { ...profile.metadata },
     typesetting: {
@@ -305,6 +377,16 @@ export function resolveExportProfile(
       fontFamily:
         typesetting.fontFamily?.trim() ||
         DEFAULT_EXPORT_PROFILE.typesetting.fontFamily,
+      ...(fontSize === undefined
+        ? {}
+        : {
+            fontSize: number(fontSize, 0, 4, 72, "fontSize"),
+          }),
+      ...(lineSpacing === undefined
+        ? {}
+        : {
+            lineSpacing: number(lineSpacing, 0, 0.5, 3, "lineSpacing"),
+          }),
       textIndentEm: number(
         typesetting.textIndentEm,
         DEFAULT_EXPORT_PROFILE.typesetting.textIndentEm,
@@ -339,6 +421,7 @@ export function resolveExportProfile(
         50,
         "linesPerPage"
       ),
+      gridMode,
       margins: resolvedMargins,
       pageNumbers: {
         enabled: boolean(

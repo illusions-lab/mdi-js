@@ -34,6 +34,11 @@ const changedFiles = execFileSync(
   .filter(Boolean);
 const changedPackages = new Set();
 const dependencyRoots = new Set();
+const packagingChanged = changedFiles.some(
+  (file) =>
+    file === "nodejs/scripts/pack-publishable-package.mjs" ||
+    file === "nodejs/scripts/publish-versioned-packages.mjs"
+);
 
 for (const file of changedFiles) {
   const nodejsRelative = relative(root, join(root, "..", file));
@@ -60,6 +65,16 @@ for (const file of changedFiles) {
       changedPackages.add(core.manifest.name);
       dependencyRoots.add(core.manifest.name);
     }
+  }
+}
+
+// The publish packer determines the manifest inside every npm tarball. When
+// it changes, existing registry releases cannot be repaired in place, so all
+// public packages need a new patch release with the corrected artifact.
+if (packagingChanged) {
+  for (const { manifest } of allPackages) {
+    changedPackages.add(manifest.name);
+    dependencyRoots.add(manifest.name);
   }
 }
 

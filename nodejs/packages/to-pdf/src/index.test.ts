@@ -52,6 +52,7 @@ describe("PDF page-number layout", () => {
       landscape: false,
       charactersPerLine: 40,
       linesPerPage: 30,
+      gridMode: "strict" as const,
       margins: { top: 25.4, right: 25.4, bottom: 25.4, left: 25.4 },
       pageNumbers: { enabled: true, format, position },
     },
@@ -78,19 +79,19 @@ describe("PDF export profile", () => {
       resolveExportProfile()
     );
     expect(html).toContain("@page{size:210mm 297mm");
-    expect(html).toContain("@page{size:210mm 297mm;margin:25.4mm 25.4mm 25.4mm 25.4mm}");
+    expect(html).toContain("@page{size:210mm 297mm;margin:20mm 18mm 20mm 18mm}");
     expect(html).not.toContain("body{padding:");
     expect(html).toContain("html{writing-mode:horizontal-tb!important");
-    expect(html).toContain("p+h1,p+h2,p+h3,p+h4,p+h5,p+h6{padding-top:.75em}");
+    expect(html).not.toContain("p+h1,p+h2,p+h3,p+h4,p+h5,p+h6{padding-top:.75em}");
   });
   it("applies margins through @page so every forced page receives them", () => {
     const html = applyPdfProfile(
       "<html><head></head><body><p>first</p><div class=\"mdi-pagebreak\"></div><p>second</p></body></html>",
       resolveExportProfile()
     );
-    expect(html).toContain("@page{size:210mm 297mm;margin:25.4mm 25.4mm 25.4mm 25.4mm}");
+    expect(html).toContain("@page{size:210mm 297mm;margin:20mm 18mm 20mm 18mm}");
     expect(html).toContain("mdi-pagebreak");
-    expect(html).not.toContain("padding:25.4mm");
+    expect(html).not.toContain("padding:20mm");
   });
   it("applies geometry, composition, full-width indentation, and page options", () => {
     const html = applyPdfProfile(
@@ -108,6 +109,7 @@ describe("PDF export profile", () => {
           landscape: false,
           charactersPerLine: 40,
           linesPerPage: 30,
+          gridMode: "strict",
           margins: { top: 34, bottom: 28, left: 28, right: 45 },
           pageNumbers: {
             enabled: true,
@@ -123,5 +125,28 @@ describe("PDF export profile", () => {
     expect(html).toContain("writing-mode:vertical-rl");
     expect(html).toContain("font-family:Noto Serif JP");
     expect(html).toContain("<p>　　本文");
+  });
+  it("uses physical CJK grid CSS by default", () => {
+    const html = applyPdfProfile(
+      "<html><head></head><body><p>本文</p></body></html>",
+      resolveExportProfile()
+    );
+    // Printable height is 257 mm; strict 30 lines use a fixed 8.566… mm pitch.
+    expect(html).toContain("--mdi-grid-mode:strict");
+    expect(html).toContain("--mdi-characters-per-line:40");
+    expect(html).toContain("--mdi-lines-per-page:30");
+    expect(html).toMatch(/line-height:8\.566(?:6+)?mm/);
+    expect(html).toContain("p{margin:0;text-indent:1em}");
+  });
+  it("uses explicit point size and line spacing only in typographic mode", () => {
+    const html = applyPdfProfile(
+      "<html><head></head><body><p>本文</p></body></html>",
+      resolveExportProfile({
+        typesetting: { fontSize: 12, lineSpacing: 1.5 },
+        pagination: { gridMode: "typographic", charactersPerLine: 60, linesPerPage: 50 },
+      })
+    );
+    expect(html).toMatch(/font-size:4\.23\d+mm;line-height:1\.5/);
+    expect(html).toContain("line-height:1.5");
   });
 });

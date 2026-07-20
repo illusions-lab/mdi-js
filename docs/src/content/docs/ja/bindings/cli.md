@@ -1,67 +1,47 @@
 ---
 title: CLI
-description: "@illusions-lab/mdi-cli の install、format、flag、実際の挙動。"
+description: 一つの export profile を EPUB、DOCX、PDF、text に適用して .mdi を shell から出力する方法。
 ---
 
-**前提:** [Getting Started](/ja/guides/getting-started/)。
+**前提:** [Getting Started](/ja/guides/getting-started/)、[Export profiles](/ja/ecosystem/export-profiles/)。
 
-`.mdi` を code なしに HTML、PDF、EPUB、DOCX、TXT に変換するには `mdi build` を使います。CLI は同じ Rust function を呼び、extension 選択と file write 以外に renderer を持ちません。
-
-## この binding で解決すること
-
-一つの `.mdi` file から code を書かずに全出力を作る command-line entry point です。binary は `mdi`、subcommand は現在 `build` 一つだけです。引数なしや認識されない `--to` は usage を出して status `1` で終了します。
-
-## Install
+## Install と build
 
 ```bash
 npm install --global @illusions-lab/mdi-cli
+mdi build novel.mdi --to epub --config novel.export.json -o dist/novel.epub
 ```
 
 ```text
 mdi build <input.mdi> --to html|pdf|epub|docx|txt|txt-ruby|narou|kakuyomu|aozora|txt-all [--config export.json] [-o <output>]
 ```
 
-## command と flag
+input は UTF-8 です。`--to` は必須、`-o` は output path を上書きし `txt-all` とは併用不可、`--config` は [export profile](/ja/ecosystem/export-profiles/) JSON です。成功は `Written <path>` と status `0`、argument/input/profile/renderer/output の failure は stderr 一行と status `1` です。
 
-| Flag | 必須 | 意味 |
+## format ごとの設定
+
+| `--to` | default | renderer と profile |
 | --- | --- | --- |
-| `<input.mdi>` | Yes | UTF-8 source path |
-| `--to` | Yes | 下記の format |
-| `-o` | No | 出力 path。`txt-all` とは併用不可 |
-| `--config` | No | [export profile](/ja/ecosystem/export-profiles/) JSON |
+| `html` | `novel.html` | Rust semantic standalone HTML。page profile は使わない。 |
+| `pdf` | `novel.pdf` | Rust HTML + local Chromium。print profile を使う。 |
+| `epub` | `novel.epub` | config なしは Rust baseline。config があれば metadata/type/chapter/cover を使う。 |
+| `docx` | `novel.docx` | config なしは Rust baseline。config があれば metadata/page/type/numbering を使う。 |
+| text 5 形式 | 各 `.txt` | Rust text。profile は indent を決める。`aozora` は Shift_JIS。 |
+| `txt-all` | 6 files | 全 text を書き、`-o` を reject。 |
 
-```bash
-echo '{東京|とうきょう}は雨だった。' > novel.mdi
-mdi build novel.mdi --to html
+`epub.coverPath` は profile file からの相対 path として読み、PNG/JPEG でなければ error です。cover bytes は EPUB にのみ入り parser には渡りません。EPUB/DOCX で `--config` が静かに無視されることはもうありません。
+
+## profile 例
+
+```json
+{
+  "metadata": { "title": "雨の東京", "author": "Illusions", "language": "ja" },
+  "typesetting": { "writingMode": "vertical", "fontFamily": "Yu Mincho", "fontSize": 11, "lineSpacing": 1.6, "textIndentEm": 1 },
+  "pagination": { "pageSize": "A4", "charactersPerLine": 40, "linesPerPage": 30, "gridMode": "typographic", "margins": { "top": 20, "right": 18, "bottom": 20, "left": 18 }, "pageNumbers": { "enabled": true, "position": "bottom-center", "format": "simple" } },
+  "epub": { "chapterSplitLevel": "h1", "coverPath": "cover.png" }
+}
 ```
 
-| `--to` | default path | Rust renderer |
-| --- | --- | --- |
-| `html` / `pdf` / `epub` / `docx` | `.html` / `.pdf` / `.epub` / `.docx` | HTML / HTML + Chromium / EPUB / DOCX |
-| `txt` | `.txt` | ruby を捨てる text |
-| `txt-ruby` | `_ruby.txt` | ruby を維持 |
-| `narou` / `kakuyomu` / `aozora` | respective suffix | 投稿規約 text。aozora は Shift_JIS |
-| `txt-all` | 6 text file | `-o` は reject |
+profile なしの publisher default は A4、40 字 × 30 行、上下 20 mm・左右 18 mm です。`gridMode: "strict"` が default で、grid から type size/leading を導出し、明示的な `fontSize`/`lineSpacing` を reject します。この例は両方を指定するため `"typographic"` を選びます。grid は sizing calculation を決めるもので、heading、強制 break、利用 font、reader layout の後も各 page が厳密に 40×30 glyph slot になる証明ではありません。
 
-PDF 以外は Rust core が直接 render します。PDF は Rust HTML を local Chromium が layout します。Chromium は `.mdi` を見ません。`--config` は現在 PDF geometry/font と text indentation に効き、EPUB/DOCX は front matter metadata のみを読みます。
-
-failure は stderr 一行と exit `1`、success は `Written <path>` と exit `0` です。全 format は実装済みです。EPUB/DOCX の profile 対応、watch/server/editor、glob/batch input は未対応です。
-
-## Text format と export profile
-
-各 text flavor は単独で、または `txt-all`（`-o` は不可）でまとめて出力できます。`txt-all` は通常 text、ruby、narou、kakuyomu、aozora の各 file を input の隣に書きます。構文ごとの対応は [構文リファレンス](/ja/syntax/reference/) を参照してください。
-
-`--config` は現在 PDF の geometry/font と text の indentation に効きます。EPUB/DOCX は意図的に front matter metadata のみを使い、profile をまだ消費しません。未対応 format へ `--config` を渡しても error にはなりません。
-
-## Error と exit code
-
-失敗時は stack trace ではなく stderr に一行を出し status `1` で終了します。存在しない input は OS の `ENOENT` message、未知 format や不足 flag は usage、`txt-all -o` は `--to txt-all does not accept -o` を出します。成功時は `Written <path>` と status `0` です。
-
-## 現在の実装状況と非対応
-
-表の全 format は実装済みで、別 JavaScript renderer や `remark`/`micromark` parse pass は通りません。EPUB/DOCX の profile 対応、watch/server/editor、glob/batch input は未対応です。PDF は実行マシンに Chromium-family browser が必要です。
-
-## 次へ
-
-- [Export profile](/ja/ecosystem/export-profiles/)
-- [レンダリングモデル](/ja/core/rendering/)
+MDI parsing/diagnostic/span は Rust の責務です。profile は publication policy、PDF geometry と Chromium layout は host policy です。PDF は `@illusions-lab/mdi-to-pdf` と local Chromium を要し、Chromium は `.mdi` ではなく完成 HTML を受け取ります。DOCX は page/type/numbering を設定できますが、ruby、tate-chu-yoko、禁則/改行禁止、kern、blank paragraph が browser と pixel-identical である保証はありません。対象 reader で確認してください。

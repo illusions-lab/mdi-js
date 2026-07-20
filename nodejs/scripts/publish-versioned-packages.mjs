@@ -1,7 +1,9 @@
-import { appendFileSync, readFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { globSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { packPublishablePackage } from "./pack-publishable-package.mjs";
 
 // Packages stay in nodejs/, while the pnpm workspace moved to the repository
 // root. Keep those two locations explicit: publishing a package must build the
@@ -39,13 +41,23 @@ if (pending.length > 0 && !dryRun) {
     stdio: "inherit",
   });
   for (const { manifestPath } of pending) {
+    const artifactsDirectory = mkdtempSync(join(tmpdir(), "mdi-npm-publish-"));
     // npm CLI detects GitHub Actions OIDC and exchanges it for a short-lived
     // publish credential. Do not replace this with pnpm publish: trusted
     // publishing authentication is implemented by npm itself.
-    execFileSync("npm", ["publish", "--access", "public"], {
-      cwd: dirname(manifestPath),
-      stdio: "inherit",
-    });
+    try {
+      const tarball = packPublishablePackage({
+        packageDirectory: dirname(manifestPath),
+        workspaceRoot: packagesRoot,
+        outputDirectory: artifactsDirectory,
+      });
+      execFileSync("npm", ["publish", tarball, "--access", "public"], {
+        cwd: packagesRoot,
+        stdio: "inherit",
+      });
+    } finally {
+      rmSync(artifactsDirectory, { recursive: true, force: true });
+    }
   }
 }
 

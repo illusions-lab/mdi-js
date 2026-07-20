@@ -3,7 +3,22 @@ import type { Handler, State } from "mdast-util-to-hast";
 import type {} from "mdast-util-mdi";
 import type { Element, Root as HastRoot } from "hast";
 import type { Root } from "mdast";
-import type { MdiFrontmatter } from "@illusions-lab/mdi-remark";
+/** Front matter values consumed by publication renderers. */
+export interface MdiFrontmatter {
+	mdi: string;
+	title?: string;
+	author?: string;
+	lang: string;
+	date?: string;
+	writingMode: "horizontal" | "vertical";
+	pageProgression: "ltr" | "rtl";
+}
+
+declare module "mdast" {
+	interface RootData {
+		frontmatter?: MdiFrontmatter;
+	}
+}
 import { MDI_STYLESHEET } from "./stylesheet.js";
 
 export const MDI_SPEC_VERSION = "2.0";

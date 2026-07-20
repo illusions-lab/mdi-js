@@ -21,13 +21,22 @@ import {
 } from "docx";
 import type { Root, RootContent, PhrasingContent } from "mdast";
 import type {} from "mdast-util-mdi";
-import type {} from "@illusions-lab/mdi-remark";
 import {
   PAGE_DIMENSIONS,
   resolvePrintProfile,
   type ExportProfile,
   type ResolvedExportProfile,
 } from "@illusions-lab/mdi-export-profile";
+
+declare module "mdast" {
+  interface RootData {
+    frontmatter?: {
+      title?: string;
+      author?: string;
+      writingMode: "horizontal" | "vertical";
+    };
+  }
+}
 
 export const MDI_SPEC_VERSION = "2.0";
 
@@ -72,11 +81,14 @@ export async function mdiToDocx(
       : heightMm -
         options.pagination.margins.top -
         options.pagination.margins.bottom;
-  const fontSizeMm = primary / options.pagination.charactersPerLine;
+  const fontSizeMm = options.typesetting.fontSize === undefined
+    ? primary / options.pagination.charactersPerLine
+    : (options.typesetting.fontSize / 72) * 25.4;
   const fontSizeHalfPoints = Math.round((fontSizeMm / 25.4) * 72 * 2);
-  const lineTwips = Math.round(
-    (cross / options.pagination.linesPerPage / 25.4) * 1440
-  );
+  const strictGrid = options.pagination.gridMode === "strict";
+  const lineTwips = options.typesetting.lineSpacing === undefined
+    ? Math.round((cross / options.pagination.linesPerPage / 25.4) * 1440)
+    : Math.round(fontSizeHalfPoints * 10 * options.typesetting.lineSpacing);
   const document = new Document({
     title: options.metadata.title ?? tree.data?.frontmatter?.title,
     creator: options.metadata.author ?? tree.data?.frontmatter?.author,
@@ -100,22 +112,22 @@ export async function mdiToDocx(
             size: fontSizeHalfPoints,
             color: "000000",
           },
-          paragraph: { spacing: { line: lineTwips, after: 120 } },
+          paragraph: { spacing: { line: lineTwips, after: strictGrid ? 0 : 120 } },
         },
-        heading1: headingStyle(options, 1),
-        heading2: headingStyle(options, 2),
-        heading3: headingStyle(options, 3),
-        heading4: headingStyle(options, 4),
-        heading5: headingStyle(options, 5),
-        heading6: headingStyle(options, 6),
+        heading1: headingStyle(options, 1, fontSizeHalfPoints),
+        heading2: headingStyle(options, 2, fontSizeHalfPoints),
+        heading3: headingStyle(options, 3, fontSizeHalfPoints),
+        heading4: headingStyle(options, 4, fontSizeHalfPoints),
+        heading5: headingStyle(options, 5, fontSizeHalfPoints),
+        heading6: headingStyle(options, 6, fontSizeHalfPoints),
         listParagraph: {
           run: { font: options.typesetting.fontFamily, color: "000000" },
         },
       },
       paragraphStyles: [
-        customHeadingStyle(options, 7),
-        customHeadingStyle(options, 8),
-        customHeadingStyle(options, 9),
+        customHeadingStyle(options, 7, fontSizeHalfPoints),
+        customHeadingStyle(options, 8, fontSizeHalfPoints),
+        customHeadingStyle(options, 9, fontSizeHalfPoints),
         {
           id: "MdiQuote",
           name: "MDI Quote",
@@ -123,7 +135,7 @@ export async function mdiToDocx(
           run: { font: options.typesetting.fontFamily, color: "000000", italics: true },
           paragraph: {
             indent: { left: 720, right: 360 },
-            spacing: { before: 120, after: 120, line: lineTwips },
+            spacing: { before: strictGrid ? 0 : 120, after: strictGrid ? 0 : 120, line: lineTwips },
           },
         },
         {
@@ -131,7 +143,7 @@ export async function mdiToDocx(
           name: "MDI List",
           basedOn: "ListParagraph",
           run: { font: options.typesetting.fontFamily, color: "000000" },
-          paragraph: { spacing: { after: 60, line: lineTwips } },
+          paragraph: { spacing: { after: strictGrid ? 0 : 60, line: lineTwips } },
         },
         {
           id: "MdiCode",
@@ -140,7 +152,7 @@ export async function mdiToDocx(
           run: { font: "Courier New", color: "000000" },
           paragraph: {
             indent: { left: 360, right: 360 },
-            spacing: { before: 120, after: 120, line: lineTwips },
+            spacing: { before: strictGrid ? 0 : 120, after: strictGrid ? 0 : 120, line: lineTwips },
           },
         },
         {
@@ -148,7 +160,7 @@ export async function mdiToDocx(
           name: "MDI Thematic Break",
           basedOn: "Normal",
           run: { font: options.typesetting.fontFamily, color: "000000" },
-          paragraph: { spacing: { before: 120, after: 180 } },
+          paragraph: { spacing: { before: strictGrid ? 0 : 120, after: strictGrid ? 0 : 180, line: lineTwips } },
         },
       ],
     },
@@ -174,6 +186,20 @@ export async function mdiToDocx(
                 }
               : {}),
           },
+          // Word's document grid is the only portable OOXML mechanism that
+          // expresses a publisher's characters × lines contract. The body
+          // font is derived from the inline extent, and linePitch from the
+          // block extent, so charSpace 0 means one full-width character per
+          // calculated cell rather than an arbitrary visual approximation.
+          ...(strictGrid
+            ? {
+                grid: {
+                  type: "linesAndChars" as const,
+                  charSpace: 0,
+                  linePitch: lineTwips,
+                },
+              }
+            : {}),
         },
         children,
       },
@@ -183,17 +209,24 @@ export async function mdiToDocx(
 }
 
 /** Word's built-in Heading styles are blue by default; MDI uses a black print hierarchy. */
-function headingStyle(options: ResolvedExportProfile, level: number) {
+function headingStyle(
+  options: ResolvedExportProfile,
+  level: number,
+  bodyFontSizeHalfPoints = 22
+) {
   const before = [360, 300, 240, 180, 150, 120][level - 1] ?? 120;
+  const strictGrid = options.pagination.gridMode === "strict";
   return {
     run: {
       font: options.typesetting.fontFamily,
       color: "000000",
       bold: true,
-      size: headingFontSize(level),
+      size: strictGrid
+        ? bodyFontSizeHalfPoints
+        : headingFontSize(level, bodyFontSizeHalfPoints),
     },
     paragraph: {
-      spacing: { before, after: 120 },
+      spacing: { before: strictGrid ? 0 : before, after: strictGrid ? 0 : 120 },
       keepNext: true,
       keepLines: true,
       outlineLevel: level - 1,
@@ -201,13 +234,17 @@ function headingStyle(options: ResolvedExportProfile, level: number) {
   };
 }
 
-function headingFontSize(level: number): number {
+function headingFontSize(level: number, bodyFontSizeHalfPoints = 22): number {
   const scale = [1.8, 1.55, 1.35, 1.2, 1.1, 1][level - 1] ?? 1;
-  return Math.round(22 * scale);
+  return Math.round(bodyFontSizeHalfPoints * scale);
 }
 
-function customHeadingStyle(options: ResolvedExportProfile, level: number) {
-  const style = headingStyle(options, level);
+function customHeadingStyle(
+  options: ResolvedExportProfile,
+  level: number,
+  bodyFontSizeHalfPoints = 22
+) {
+  const style = headingStyle(options, level, bodyFontSizeHalfPoints);
   return {
     id: `Heading${level}`,
     name: `Heading ${level}`,
@@ -256,6 +293,10 @@ function block(
   context: DocxContext
 ): Array<Paragraph | DocxTable> {
   if (node.type === "heading")
+    {
+      const runSize = options.pagination.gridMode === "strict"
+        ? bodyFontSizeHalfPoints(options)
+        : headingFontSize(node.depth);
     return [
       new Paragraph({
         heading: [
@@ -266,9 +307,10 @@ function block(
           HeadingLevel.HEADING_5,
           HeadingLevel.HEADING_6,
         ][node.depth - 1],
-        children: inline(node.children, context, headingFontSize(node.depth)),
+        children: inline(node.children, context, runSize),
       }),
     ];
+    }
   if (node.type === "paragraph") return [paragraph(node.children, options, undefined, context)];
   if (node.type === "list")
     return node.children.flatMap((item) =>
@@ -362,7 +404,7 @@ function paragraph(
   style: string | undefined,
   context: DocxContext
 ): Paragraph {
-  const fontSizeMm = (() => {
+  const fontSizeMm = options.typesetting.fontSize === undefined ? (() => {
     const dimensions = PAGE_DIMENSIONS[options.pagination.pageSize];
     const primary =
       options.typesetting.writingMode === "vertical"
@@ -377,7 +419,7 @@ function paragraph(
           options.pagination.margins.left -
           options.pagination.margins.right;
     return primary / options.pagination.charactersPerLine;
-  })();
+  })() : (options.typesetting.fontSize / 72) * 25.4;
   const prefix = options.typesetting.fullwidthSpaceIndent
     ? [new TextRun("　".repeat(Math.round(options.typesetting.textIndentEm)))]
     : [];
@@ -432,6 +474,16 @@ function inline(
       const id = context.footnoteIds.get(node.identifier);
       return id ? [new FootnoteReferenceRun(id)] : [];
     }
+    // Word only has the built-in dot emphasis mark. MDI accepts arbitrary
+    // marks, so retaining the emphasis semantics is preferable to pretending
+    // that the requested glyph can be represented exactly in OOXML.
+    if (node.type === "mdiEm")
+      return [
+        new TextRun({
+          emphasisMark: { type: "dot" },
+          children: inline(node.children, context, rubyBaseTextSize),
+        }),
+      ];
     if (node.type === "mdiRuby") return [rawRun(rubyXml(node.base, node.ruby, rubyBaseTextSize))];
     if (node.type === "mdiTcy")
       return [
@@ -441,9 +493,41 @@ function inline(
           )}</w:t></w:r>`
         ),
       ];
+    // Word has no two-line warichu layout. Keep the source text and use a
+    // deliberately modest (60%) run as a stable, visible fallback.
+    if (node.type === "mdiWarichu")
+      return [
+        new TextRun({
+          size: Math.max(10, Math.round(rubyBaseTextSize * 0.6)),
+          children: inline(node.children, context, rubyBaseTextSize),
+        }),
+      ];
+    if (node.type === "mdiKern") {
+      const spacing = kernTwips(node.amount, rubyBaseTextSize);
+      return [
+        new TextRun({
+          ...(spacing === 0 ? {} : { characterSpacing: spacing }),
+          children: inline(node.children, context, rubyBaseTextSize),
+        }),
+      ];
+    }
+    // OOXML cannot mark an arbitrary run as non-breaking (the available
+    // no-break-hyphen element only applies to a hyphen). Preserve its content
+    // rather than emitting a misleading layout instruction.
+    if (node.type === "mdiNoBreak")
+      return inline(node.children, context, rubyBaseTextSize);
     if ("children" in node) return inline(node.children as PhrasingContent[], context, rubyBaseTextSize);
     return [];
   });
+}
+
+/** Converts MDI's validated `em` tracking into Word's signed twips. */
+function kernTwips(amount: string, baseTextSize: number): number {
+  const value = Number.parseFloat(amount);
+  // `amount` is parser-validated, but keep programmatic mdast input safe.
+  if (!Number.isFinite(value) || !amount.endsWith("em")) return 0;
+  // `baseTextSize` is half-points; one em is therefore base * 10 twips.
+  return Math.round(value * baseTextSize * 10);
 }
 
 function inlineText(nodes: PhrasingContent[]): string {
@@ -452,6 +536,19 @@ function inlineText(nodes: PhrasingContent[]): string {
 
 function mmToTwips(mm: number): number {
   return Math.round((mm / 25.4) * 1440);
+}
+
+/** Body size is the inline extent divided by the publisher's character count. */
+function bodyFontSizeHalfPoints(options: ResolvedExportProfile): number {
+  if (options.typesetting.fontSize !== undefined)
+    return Math.round(options.typesetting.fontSize * 2);
+  const dimensions = PAGE_DIMENSIONS[options.pagination.pageSize];
+  const widthMm = options.pagination.landscape ? dimensions.height : dimensions.width;
+  const heightMm = options.pagination.landscape ? dimensions.width : dimensions.height;
+  const inlineExtent = options.typesetting.writingMode === "vertical"
+    ? heightMm - options.pagination.margins.top - options.pagination.margins.bottom
+    : widthMm - options.pagination.margins.left - options.pagination.margins.right;
+  return Math.round((inlineExtent / options.pagination.charactersPerLine / 25.4) * 72 * 2);
 }
 function rubyXml(base: string, reading: string | string[], baseTextSize = 24): string {
   const text = Array.isArray(reading) ? reading.join(".") : reading;

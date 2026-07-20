@@ -182,9 +182,19 @@ function epubStyles(profile: ResolvedExportProfile): string {
     profile.typesetting.writingMode === "vertical"
       ? "writing-mode:vertical-rl;-webkit-writing-mode:vertical-rl;text-orientation:mixed;"
       : "";
+  const fontSize = profile.typesetting.fontSize === undefined
+    ? ""
+    : `font-size:${profile.typesetting.fontSize}pt;`;
+  const lineSpacing = profile.typesetting.lineSpacing ?? 1.8;
+  // EPUB uses CSS first-line indentation. It is the interoperable equivalent
+  // of the literal ideographic-space prefix used by DOCX, and keeps copied
+  // text free from synthetic characters.
+  const fullwidthIndent = profile.typesetting.fullwidthSpaceIndent
+    ? "--mdi-fullwidth-space-indent:1;"
+    : "";
   return `body{font-family:${css(
     profile.typesetting.fontFamily
-  )};${mode}line-height:1.8;margin:1em}p{text-indent:${
+  )};${fontSize}${mode}line-height:${lineSpacing};margin:1em}p{${fullwidthIndent}text-indent:${
     profile.typesetting.textIndentEm
   }em;margin:.3em 0}${MDI_STYLESHEET}`;
 }

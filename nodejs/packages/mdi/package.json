@@ -17,20 +17,30 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "default": "./dist/node.js"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts",
+    "build": "tsup src/index.ts src/node.ts --format esm,cjs --dts",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@illusions-lab/mdi-core": "workspace:*"
+    "@illusions-lab/mdi-core": "workspace:*",
+    "@illusions-lab/mdi-export-profile": "workspace:*",
+    "@illusions-lab/mdi-to-docx": "workspace:*",
+    "@illusions-lab/mdi-to-epub": "workspace:*",
+    "@types/mdast": "^4.0.0",
+    "yaml": "^2.0.0"
   },
   "devDependencies": {
+    "jszip": "^3.10.0",
     "tsup": "^8.3.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"

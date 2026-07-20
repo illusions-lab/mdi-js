@@ -33,6 +33,7 @@ jobs:
       - run: pnpm --filter @illusions-lab/mdi-to-pdf exec playwright install --with-deps chromium
       - run: pnpm typecheck
       - run: pnpm build
+      - run: node --test nodejs/scripts/pack-publishable-package.test.mjs
       - run: pnpm test:coverage
 
       - name: Upload Node.js coverage to Codecov

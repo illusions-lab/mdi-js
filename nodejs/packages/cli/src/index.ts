@@ -6,7 +6,15 @@ import {
   resolveExportProfile,
   type ExportProfile,
 } from "@illusions-lab/mdi-export-profile";
-import { renderDocx, renderEpub, renderHtml, renderTextFormat } from "@illusions-lab/mdi";
+import {
+  renderDocx,
+  renderDocxWithProfile,
+  renderEpub,
+  renderEpubWithProfile,
+  renderHtml,
+  renderTextFormat,
+  type EpubCover,
+} from "@illusions-lab/mdi";
 
 export const MDI_SPEC_VERSION = "2.0";
 export type OutputFormat =
@@ -80,9 +88,16 @@ export async function build(
           await import("@illusions-lab/mdi-to-pdf")
         ).renderHtmlToPdf(renderHtml(source), resolvedOptions.profile)
       : format === "epub"
-      ? renderEpub(source)
+      ? resolvedOptions.profile
+        ? await renderEpubWithProfile(source, {
+            profile: resolvedOptions.profile,
+            cover: await loadEpubCover(resolvedOptions.profile),
+          })
+        : renderEpub(source)
       : format === "docx"
-      ? renderDocx(source)
+      ? resolvedOptions.profile
+        ? await renderDocxWithProfile(source, resolvedOptions.profile)
+        : renderDocx(source)
       : "";
   const extension = format;
   const destination =
@@ -140,6 +155,28 @@ export async function loadExportProfile(
       profile.epub.coverPath
     );
   return profile;
+}
+
+/** Load and identify the cover configured in an EPUB publication profile. */
+async function loadEpubCover(profile: ExportProfile): Promise<EpubCover | undefined> {
+  const path = profile.epub?.coverPath;
+  if (!path) return undefined;
+  const data = await readFile(path);
+  if (
+    data.length >= 8 &&
+    data[0] === 0x89 &&
+    data[1] === 0x50 &&
+    data[2] === 0x4e &&
+    data[3] === 0x47 &&
+    data[4] === 0x0d &&
+    data[5] === 0x0a &&
+    data[6] === 0x1a &&
+    data[7] === 0x0a
+  ) return { data, mediaType: "image/png" };
+  if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) {
+    return { data, mediaType: "image/jpeg" };
+  }
+  throw new Error(`EPUB cover must be a PNG or JPEG image: ${path}`);
 }
 
 async function writeTextOutput(destination: string, text: string, format: TextOutputFormat): Promise<void> {

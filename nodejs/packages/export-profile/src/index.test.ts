@@ -13,15 +13,16 @@ describe("export profiles", () => {
         resolveExportProfile({ pagination: { pageSize } }).pagination.pageSize
       ).toBe(pageSize);
   });
-  it("uses an A4 portrait print layout with conventional margins by default", () => {
+  it("uses the publisher A4 40 × 30 strict manuscript grid by default", () => {
     const profile = resolveExportProfile();
     expect(profile.typesetting.writingMode).toBe("horizontal");
     expect(profile.pagination).toMatchObject({
       pageSize: "A4",
       landscape: false,
       charactersPerLine: 40,
-      linesPerPage: 34,
-      margins: { top: 25.4, bottom: 25.4, left: 25.4, right: 25.4 },
+      linesPerPage: 30,
+      gridMode: "strict",
+      margins: { top: 20, bottom: 20, left: 18, right: 18 },
     });
   });
   it("uses front matter for the writing-mode default without overriding explicit settings", () => {
@@ -65,6 +66,38 @@ describe("export profiles", () => {
     });
     expect(profile.epub.chapterSplitLevel).toBe("h3");
   });
+  it("normalizes explicit point sizes and baseline multipliers", () => {
+    const profile = resolveExportProfile({
+      typesetting: { fontSize: 11, lineSpacing: 1.5 },
+      pagination: { gridMode: "typographic" },
+    });
+    expect(profile.typesetting).toMatchObject({
+      fontSize: 11,
+      lineSpacing: 1.5,
+    });
+    expect(
+      resolveExportProfile({
+        typesetting: { fontSizePt: 10.5, lineHeight: 1.2 },
+        pagination: { gridMode: "typographic" },
+      }).typesetting
+    ).toMatchObject({ fontSize: 10.5, lineSpacing: 1.2 });
+    expect(resolveExportProfile().typesetting.fontSize).toBeUndefined();
+    expect(resolveExportProfile().typesetting.lineSpacing).toBeUndefined();
+  });
+  it("does not silently break a strict publisher grid", () => {
+    expect(() =>
+      resolveExportProfile({ typesetting: { fontSize: 11 } })
+    ).toThrow("gridMode: typographic");
+    expect(() =>
+      resolveExportProfile({ typesetting: { lineSpacing: 1.5 } })
+    ).toThrow("gridMode: typographic");
+    expect(
+      resolveExportProfile({
+        pagination: { gridMode: "typographic", charactersPerLine: 32, linesPerPage: 28 },
+        typesetting: { fontSize: 11, lineSpacing: 1.4 },
+      }).pagination
+    ).toMatchObject({ gridMode: "typographic", charactersPerLine: 32, linesPerPage: 28 });
+  });
   it("rejects malformed profiles", () => {
     expect(() => parseExportProfileJson("[]")).toThrow("JSON object");
     expect(() => parseExportProfileJson("{")).toThrow("valid JSON");
@@ -92,6 +125,18 @@ describe("export profiles", () => {
     );
     expect(() => resolveExportProfile({ typesetting: { fontFamily: 1 as never } })).toThrow(
       "fontFamily must be a string"
+    );
+    expect(() => resolveExportProfile({ typesetting: { fontSize: 3 } })).toThrow(
+      "fontSize"
+    );
+    expect(() => resolveExportProfile({ typesetting: { lineSpacing: 4 } })).toThrow(
+      "lineSpacing"
+    );
+    expect(() => resolveExportProfile({ pagination: { gridMode: "flexible" as never } })).toThrow(
+      "gridMode"
+    );
+    expect(() => resolveExportProfile({ typesetting: { fontSize: 11, fontSizePt: 12 } })).toThrow(
+      "fontSize and fontSizePt"
     );
     expect(() => resolveExportProfile({ epub: { coverPath: 1 as never } })).toThrow(
       "coverPath must be a string"

@@ -1,5 +1,6 @@
+import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
-import { MDI_IR_VERSION, MDI_SPEC_VERSION, parse, renderDocx, renderEpub, renderHtml, renderText, renderTextFormat, serializeMdi } from "./index.js";
+import { MDI_IR_VERSION, MDI_SPEC_VERSION, parse, prepareRender, renderDocx, renderDocxWithDiagnostics, renderDocxWithProfile, renderEpub, renderEpubWithDiagnostics, renderEpubWithProfile, renderHtml, renderHtmlWithDiagnostics, renderText, renderTextFormat, renderTextFormatWithDiagnostics, renderTextWithDiagnostics, serializeMdi, toPublicationMdast } from "./index.js";
 
 function assertValidSpans(node: { span?: { startByte: number; endByte: number }; children?: unknown[] }, source: string): void {
 	if (node.span) {
@@ -75,6 +76,50 @@ describe("Rust MDI JavaScript binding", () => {
 		expect(html).toContain('<span class="mdi-tcy">12</span>');
 	});
 
+	it("offers body-only semantic HTML without changing Rust rendering", () => {
+		const full = renderHtml("# 題\n\n{東京|とうきょう}");
+		const body = renderHtml("# 題\n\n{東京|とうきょう}", { bodyOnly: true });
+		expect(full).toContain("<!DOCTYPE html>");
+		expect(body).not.toContain("<!DOCTYPE html>");
+		expect(body).toContain("<h1>題</h1>");
+		expect(body).toContain('<ruby class="mdi-ruby">東京');
+		expect(() => renderHtml("text", { bodyOnly: "yes" as never })).toThrow(
+			"options.bodyOnly must be a boolean",
+		);
+	});
+
+	it("keeps diagnostics, source spans, and headings with HTML output", () => {
+		const source = "# 第一章\n\n## {東京|とうきょう}";
+		const result = renderHtmlWithDiagnostics(source, { bodyOnly: true });
+		expect(result.output).toContain("<h1>第一章</h1>");
+		expect(result.document.span).toEqual({ startByte: 0, endByte: Buffer.byteLength(source) });
+		expect(result.diagnostics).toEqual(parse(source).diagnostics);
+		expect(result.headings).toMatchObject([
+			{ depth: 1, text: "第一章", span: { startByte: 0 } },
+			{ depth: 2, text: "東京" },
+		]);
+		expect(result.headings[1]!.span).toEqual({
+			startByte: Buffer.byteLength("# 第一章\n\n"),
+			endByte: Buffer.byteLength(source),
+		});
+		expect(result.headings[1]!.node.children?.[0]).toMatchObject({ type: "ruby" });
+	});
+
+	it("makes parse-first validation explicit for host render workflows", () => {
+		const prepared = prepareRender("# before export");
+		expect(prepared.document.children[0]).toMatchObject({ type: "heading", depth: 1 });
+		expect(prepared.diagnostics).toEqual([]);
+	});
+
+	it("keeps diagnostics with text and baseline archive renderer outputs", () => {
+		const text = renderTextWithDiagnostics("# chapter\n\ntext");
+		expect(text.output).toBe("chapter\ntext\n");
+		expect(text.headings).toMatchObject([{ depth: 1, text: "chapter" }]);
+		expect(renderTextFormatWithDiagnostics("{東京|とうきょう}", "narou").output).toBe("｜東京《とうきょう》");
+		expect([...renderEpubWithDiagnostics("text").output.slice(0, 2)]).toEqual([0x50, 0x4b]);
+		expect([...renderDocxWithDiagnostics("text").output.slice(0, 2)]).toEqual([0x50, 0x4b]);
+	});
+
 	it("normalizes MDI through Rust's serializer", () => {
 		expect(serializeMdi("{東京|とう.きょう} ^12^")).toBe("{東京|とう.きょう} ^12^\n");
 	});
@@ -96,5 +141,161 @@ describe("Rust MDI JavaScript binding", () => {
 	it("packages a baseline DOCX through Rust", () => {
 		const docx = renderDocx("text");
 		expect([...docx.slice(0, 2)]).toEqual([0x50, 0x4b]);
+	});
+
+	it("publishes a configured EPUB with metadata, cover, chapters, and vertical type", async () => {
+		const epub = await renderEpubWithProfile("# First\n\nbody\n\n# Second\n\nmore", {
+			profile: {
+				metadata: { title: "Configured book", author: "MDI", identifier: "test:configured" },
+				typesetting: { writingMode: "vertical", fontFamily: "Noto Serif JP", textIndentEm: 2 },
+				epub: { chapterSplitLevel: "h1" },
+			},
+			cover: { data: new Uint8Array([137, 80, 78, 71]), mediaType: "image/png" },
+		});
+		const zip = await JSZip.loadAsync(epub);
+		const opf = await zip.file("OEBPS/package.opf")!.async("string");
+		const css = await zip.file("OEBPS/style.css")!.async("string");
+
+		expect(zip.file("OEBPS/cover.png")).toBeTruthy();
+		expect(opf).toContain("<dc:title>Configured book</dc:title>");
+		expect(opf).toContain("<dc:creator>MDI</dc:creator>");
+		expect(opf).toContain('page-progression-direction="rtl"');
+		expect(css).toContain("writing-mode:vertical-rl");
+		expect(css).toContain("font-family:Noto Serif JP");
+		expect(Object.keys(zip.files).filter((name) => name.startsWith("OEBPS/chapter-"))).toHaveLength(2);
+	});
+
+	it("offers configured EPUB through the renderEpub overload", async () => {
+		const epub = await renderEpub("# chapter", {
+			title: "Ergonomic book",
+			verticalWriting: true,
+			fontFamily: "Noto Serif JP",
+			textIndent: 3,
+			chapterSplitLevel: "none",
+			coverImage: new Uint8Array([137, 80, 78, 71]),
+			coverMediaType: "image/png",
+		});
+		const zip = await JSZip.loadAsync(epub);
+		expect(await zip.file("OEBPS/package.opf")!.async("string")).toContain("Ergonomic book");
+		expect(await zip.file("OEBPS/style.css")!.async("string")).toContain("text-indent:3em");
+		expect(zip.file("OEBPS/cover.png")).toBeTruthy();
+	});
+
+	it("maps EPUB typography aliases and retains diagnostics for configured archives", async () => {
+		const source = "# Chapter\n\nbody";
+		const result = await renderEpubWithDiagnostics(source, {
+			title: "Typeset EPUB",
+		fontSize: 13,
+		lineSpacing: 1.6,
+		gridMode: "typographic",
+			textIndent: 2,
+			fullwidthSpaceIndent: true,
+		});
+		const zip = await JSZip.loadAsync(result.output);
+		const css = await zip.file("OEBPS/style.css")!.async("string");
+		expect(css).toContain("font-size:13pt");
+		expect(css).toContain("line-height:1.6");
+		expect(css).toContain("--mdi-fullwidth-space-indent:1");
+		expect(css).toContain("text-indent:2em");
+		expect(result.document.span.endByte).toBe(Buffer.byteLength(source));
+		expect(result.headings).toMatchObject([{ text: "Chapter" }]);
+	});
+
+	it("publishes a configured DOCX with vertical layout, geometry, margins, and page numbering", async () => {
+		const docx = await renderDocxWithProfile("{東京|とうきょう} ^12^", {
+			metadata: { title: "Layout book", author: "MDI" },
+			typesetting: { writingMode: "vertical", fontFamily: "Noto Serif JP" },
+			pagination: {
+				pageSize: "A5",
+				margins: { top: 10, bottom: 11, left: 12, right: 13 },
+				pageNumbers: { enabled: true, format: "fraction", position: "top-right" },
+			},
+		});
+		const zip = await JSZip.loadAsync(docx);
+		const document = await zip.file("word/document.xml")!.async("string");
+		const header = await zip.file("word/header1.xml")!.async("string");
+
+		expect(document).toContain('w:textDirection w:val="tbRl"');
+		// Word rotates vertical sections so the A5 physical dimensions are swapped.
+		expect(document).toContain('w:w="11906"');
+		expect(document).toContain('w:h="8391"');
+		expect(document).toContain('w:top="567" w:right="737" w:bottom="624" w:left="680"');
+		expect(document).toContain("<w:ruby ");
+		expect(document).toContain("<w:eastAsianLayout");
+		expect(header).toContain("PAGE");
+		expect(header).toContain("NUMPAGES");
+	});
+
+	it("normalizes ergonomic DOCX layout options without mutating the caller profile", async () => {
+		const options = {
+			title: "Ergonomic DOCX",
+			verticalWriting: true,
+			fontFamily: "Noto Serif JP",
+		fontSize: 12,
+		lineSpacing: 1.5,
+		gridMode: "typographic" as const,
+			textIndent: 2,
+			pageSize: "A5" as const,
+			margins: { top: 10, bottom: 10, left: 11, right: 11 },
+			showPageNumbers: true,
+			pageNumberPosition: "top-right" as const,
+			pageNumberFormat: "fraction" as const,
+		};
+		const before = structuredClone(options);
+		const docx = await renderDocx("body", options);
+		const zip = await JSZip.loadAsync(docx);
+		const document = await zip.file("word/document.xml")!.async("string");
+		expect(options).toEqual(before);
+		expect(document).toContain('w:textDirection w:val="tbRl"');
+		expect(document).toContain('w:top="567" w:right="624" w:bottom="567" w:left="624"');
+		expect(await zip.file("word/header1.xml")!.async("string")).toContain("NUMPAGES");
+	});
+
+	it("maps DOCX grid and full-width indentation aliases with diagnostics", async () => {
+		const result = await renderDocxWithDiagnostics("body", {
+			title: "Grid book",
+			charactersPerLine: 32,
+			linesPerPage: 28,
+			textIndent: 2,
+			fullwidthSpaceIndent: true,
+		});
+		const zip = await JSZip.loadAsync(result.output);
+		const document = await zip.file("word/document.xml")!.async("string");
+		expect(document).toContain("　　");
+		expect(result.diagnostics).toEqual([]);
+	});
+
+	it("validates configured-export host inputs", async () => {
+		expect(() => renderEpub("text", null as never)).toThrow("options must be an object");
+		expect(() => renderDocx("text", [] as never)).toThrow("profile must be an object");
+		await expect(renderEpubWithProfile("text", {
+			cover: { data: "not-bytes" as never, mediaType: "image/png" },
+		})).rejects.toThrow("options.cover.data must be a Uint8Array");
+	});
+
+	it("converts the complete Rust IR structurally for publication adapters", () => {
+		const tree = toPublicationMdast({
+			span: { startByte: 0, endByte: 1 },
+			frontmatter: { span: { startByte: 0, endByte: 0 }, raw: "not: [valid", entries: [] },
+			children: [
+				{ type: "ruby", ruby: { value: "よみ" }, base: "字" },
+				{ type: "tcy", value: "12" }, { type: "break" }, { type: "em" },
+				{ type: "noBreak" }, { type: "warichu" }, { type: "kern" }, { type: "blank" },
+				{ type: "pagebreak", variant: null },
+				{ type: "paragraph", indent: 2, bottom: 1 }, { type: "unknown" },
+			],
+		} as never);
+		expect(tree.data?.frontmatter).toMatchObject({ mdi: "2.0", lang: "ja", writingMode: "horizontal" });
+		expect(tree.children.map((node) => node.type)).toEqual([
+			"yaml", "mdiRuby", "mdiTcy", "mdiBreak", "mdiEm", "mdiNoBreak", "mdiWarichu", "mdiKern", "mdiBlank", "mdiPagebreak", "paragraph", "unknown",
+		]);
+		expect((tree.children[10] as { data?: unknown }).data).toEqual({ mdiIndent: 2, mdiBottom: 1 });
+		expect(tree.children[9]).not.toHaveProperty("variant");
+	});
+
+	it("rejects malformed cover shorthands before loading publication adapters", () => {
+		expect(() => renderEpub("text", { cover: { data: new Uint8Array(), mediaType: "image/gif" as never } })).toThrow("options.cover.mediaType");
+		expect(() => renderEpub("text", { coverImage: "not-bytes" as never })).toThrow("options.coverImage");
+		expect(() => renderEpub("text", { coverMediaType: "image/gif" as never })).toThrow("options.coverMediaType");
 	});
 });

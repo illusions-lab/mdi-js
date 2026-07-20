@@ -149,6 +149,19 @@ describe("text export", () => {
 });
 
 describe("build edge cases", () => {
+
+  it("accepts a string output shorthand and rejects -o for txt-all", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mdi-cli-output-shorthand-"));
+    try {
+      const input = join(directory, "book.mdi");
+      const output = join(directory, "explicit.html");
+      await writeFile(input, "text");
+      await expect(build(input, "html", output)).resolves.toBe(output);
+      await expect(build(input, "txt-all", { output })).rejects.toThrow("does not accept -o");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
   it("rejects a missing input with the readable filesystem error", async () => {
     const missing = join(tmpdir(), "mdi-cli-missing-input.mdi");
     await expect(build(missing, "html")).rejects.toThrow(
@@ -182,6 +195,53 @@ describe("build edge cases", () => {
       const profile = await loadExportProfile(config);
       expect(profile?.epub?.coverPath).toBe(join(directory, "cover.png"));
       expect(profile?.text?.indentCount).toBe(2);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("applies configured EPUB and DOCX profiles, including a PNG cover", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mdi-cli-configured-publication-"));
+    try {
+      const input = join(directory, "book.mdi");
+      const cover = join(directory, "cover.png");
+      await writeFile(input, "# One\n\ntext\n\n# Two\n\nmore");
+      await writeFile(cover, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+      const profile = {
+        metadata: { title: "Configured CLI book" },
+        typesetting: { writingMode: "vertical" as const, fontFamily: "Noto Serif JP" },
+        pagination: { pageSize: "A5" as const, pageNumbers: { enabled: true, position: "top-right" as const } },
+        epub: { coverPath: cover, chapterSplitLevel: "h1" as const },
+      };
+      const epub = await build(input, "epub", { profile });
+      const epubZip = await JSZip.loadAsync(await readFile(epub));
+      expect(epubZip.file("OEBPS/cover.png")).toBeTruthy();
+      expect(await epubZip.file("OEBPS/package.opf")!.async("string")).toContain("Configured CLI book");
+      expect(Object.keys(epubZip.files).filter((name) => name.startsWith("OEBPS/chapter-"))).toHaveLength(2);
+
+      const docx = await build(input, "docx", { profile });
+      const docxZip = await JSZip.loadAsync(await readFile(docx));
+      expect(await docxZip.file("word/document.xml")!.async("string")).toContain('w:textDirection w:val="tbRl"');
+      expect(await docxZip.file("word/document.xml")!.async("string")).toContain('w:w="11906"');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("loads JPEG covers and rejects an unsupported configured cover", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mdi-cli-cover-formats-"));
+    try {
+      const input = join(directory, "book.mdi");
+      const jpeg = join(directory, "cover.jpg");
+      const invalid = join(directory, "cover.gif");
+      await writeFile(input, "text");
+      await writeFile(jpeg, Buffer.from([0xff, 0xd8, 0xff, 0x00]));
+      await writeFile(invalid, Buffer.from("GIF89a"));
+      const output = await build(input, "epub", { profile: { epub: { coverPath: jpeg } } });
+      const zip = await JSZip.loadAsync(await readFile(output));
+      expect(zip.file("OEBPS/cover.jpg")).toBeTruthy();
+      await expect(build(input, "epub", { profile: { epub: { coverPath: invalid } } }))
+        .rejects.toThrow("EPUB cover must be a PNG or JPEG");
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

@@ -1,23 +1,23 @@
 import JSZip from "jszip";
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
-import { unified } from "unified";
-import remarkParse from "remark-parse";
-import remarkMdi from "@illusions-lab/mdi-remark";
 import type { Root } from "mdast";
 import { mdiToDocx } from "./index.js";
 
+const require = createRequire(import.meta.url);
+const { parse: parseMdi, toPublicationMdast } = require("../../mdi/dist/index.cjs") as {
+  parse(source: string): { document: unknown };
+  toPublicationMdast(document: unknown): Root;
+};
+
 function parse(source: string): Root {
-  const p = unified().use(remarkParse).use(remarkMdi);
-  return p.runSync(p.parse(source)) as Root;
+  return toPublicationMdast(parseMdi(source).document);
 }
 
 describe("mdiToDocx", () =>
   it("creates a DOCX containing ordinary, ruby, and tcy runs", async () => {
-    const p = unified().use(remarkParse).use(remarkMdi);
     const zip = await JSZip.loadAsync(
-      await mdiToDocx(
-        p.runSync(p.parse("# Heading\n\nplain {東京|とうきょう} ^12^")) as Root
-      )
+      await mdiToDocx(parse("# Heading\n\nplain {東京|とうきょう} ^12^"))
     );
     const document = await zip.file("word/document.xml")!.async("string");
     expect(document).toContain("<w:document");
@@ -54,7 +54,7 @@ describe("DOCX heading styles", () => {
 });
 
 describe("DOCX print defaults", () => {
-  it("writes conventional A4 portrait geometry and black heading styles", async () => {
+  it("writes the strict A4 40 × 30 publisher grid and black heading styles", async () => {
     const zip = await JSZip.loadAsync(
       await mdiToDocx(parse("# Heading\n\nBody text"))
     );
@@ -63,8 +63,16 @@ describe("DOCX print defaults", () => {
     expect(document).toContain('w:w="11906"'); // A4 width in twips
     expect(document).toContain('w:h="16838"'); // A4 height in twips
     expect(document).toContain(
-      'w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"'
+      'w:top="1134" w:right="1020" w:bottom="1134" w:left="1020"'
     );
+    expect(document).toContain('w:type="linesAndChars"');
+    // OOXML's omitted charSpace is its zero (one full-width character) default.
+    expect(document).not.toContain('w:charSpace="');
+    // 257 mm printable height / 30 lines, encoded as twentieths of a point.
+    expect(document).toContain('w:linePitch="486"');
+    // A strict manuscript heading remains one grid cell tall; hierarchy is
+    // conveyed by bold/outline rather than a larger physical line.
+    expect(styles).toMatch(/w:styleId="Heading1"[\s\S]*?w:sz w:val="25"/);
     expect(document).not.toContain("w:textDirection");
     expect(styles).toMatch(
       /w:styleId="Heading1"[\s\S]*?w:color w:val="000000"/
@@ -88,7 +96,7 @@ describe("DOCX print defaults", () => {
     expect(footnotes).toContain("縦書きの脚注");
   });
 
-  it("sizes vertical heading ruby from its heading run to prevent overlap", async () => {
+  it("keeps vertical heading ruby inside the strict body grid", async () => {
     const zip = await JSZip.loadAsync(
       await mdiToDocx(
         parse("---\nwriting-mode: vertical\n---\n# {鏡背|きょうはい}の雪")
@@ -97,7 +105,7 @@ describe("DOCX print defaults", () => {
     const document = await zip.file("word/document.xml")!.async("string");
     expect(document).toContain('<w:pStyle w:val="Heading1"/>');
     expect(document).toContain(
-      '<w:rubyPr><w:rubyAlign w:val="center"/><w:hps w:val="20"/><w:hpsRaise w:val="32"/><w:hpsBaseText w:val="40"/>'
+      '<w:rubyPr><w:rubyAlign w:val="center"/><w:hps w:val="12"/><w:hpsRaise w:val="18"/><w:hpsBaseText w:val="24"/>'
     );
   });
 });
@@ -210,6 +218,27 @@ describe("mdiToDocx edge cases", () => {
     expect(document).toContain("<w:rt><w:r><w:t>とう.きょう</w:t>");
   });
 
+  it("maps MDI inline print features only where OOXML has an honest equivalent", async () => {
+    const zip = await JSZip.loadAsync(
+      await mdiToDocx(
+        parse(
+          "[[em:marked]] [[kern:-0.1em:tight]] [[warichu:note]] [[no-break:keep together]]"
+        )
+      )
+    );
+    const document = await zip.file("word/document.xml")!.async("string");
+    // Word's only native emphasis mark is a dot; MDI's default boten maps to it.
+    expect(document).toContain('<w:em w:val="dot"/>');
+    // -0.1em at the default 12pt (24 half-points) is -24 signed twips.
+    expect(document).toContain('<w:spacing w:val="-24"/>');
+    // Warichu is deliberately a visible small-text fallback, not fake two-line XML.
+    expect(document).toContain('<w:sz w:val="14"/>');
+    expect(document).toContain("note");
+    // There is no arbitrary-run OOXML no-break feature; its source is still present.
+    expect(document).toContain("keep together");
+    expect(document).not.toContain("mdiNoBreak");
+  });
+
   it("generates ordinary DOCX content without ruby or tcy XML", async () => {
     const zip = await JSZip.loadAsync(
       await mdiToDocx(parse("# Heading\n\nPlain text"))
@@ -251,5 +280,31 @@ describe("mdiToDocx edge cases", () => {
     expect(document).toContain("paragraph");
     expect(header).toContain(">PAGE<");
     expect(header).toContain("NUMPAGES");
+  });
+
+  it("uses explicit point size and line spacing only in typographic mode", async () => {
+    const zip = await JSZip.loadAsync(
+      await mdiToDocx(parse("# Heading\n\nparagraph"), {
+        typesetting: { fontSize: 12, lineSpacing: 1.5 },
+        pagination: { gridMode: "typographic", charactersPerLine: 60, linesPerPage: 50 },
+      })
+    );
+    const styles = await zip.file("word/styles.xml")!.async("string");
+    // 12 pt is 24 half-points; 1.5 lines is 360 twentieths of a point.
+    expect(styles).toContain('<w:sz w:val="24"/>');
+    expect(styles).toContain('<w:spacing w:after="120" w:line="360"');
+    // H1 is scaled relative to the explicit body size, rather than a fixed 11 pt.
+    expect(styles).toMatch(/w:styleId="Heading1"[\s\S]*?w:sz w:val="43"/);
+  });
+
+  it("does not emit a document grid when typography deliberately owns layout", async () => {
+    const zip = await JSZip.loadAsync(
+      await mdiToDocx(parse("paragraph"), {
+        pagination: { gridMode: "typographic" },
+        typesetting: { fontSize: 11, lineSpacing: 1.4 },
+      })
+    );
+    const document = await zip.file("word/document.xml")!.async("string");
+    expect(document).not.toContain('w:type="linesAndChars"');
   });
 });
