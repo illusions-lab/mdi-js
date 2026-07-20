@@ -23,13 +23,19 @@ mdi build novel.mdi --to epub -o dist/novel.epub
 mdi build novel.mdi --to docx
 mdi build novel.mdi --to txt
 mdi build novel.mdi --to txt-ruby
+mdi build novel.mdi --to narou
+mdi build novel.mdi --to kakuyomu
+mdi build novel.mdi --to aozora
+mdi build novel.mdi --to txt-all
 ```
 
 Without `-o`, the output file is written next to the input with the format's
 extension (`novel.mdi` → `novel.pdf`).
 
-`txt` writes basic plain text; `txt-ruby` keeps ruby as `{base|reading}`. They
-are not yet dedicated exporters for Narou or Aozora Bunko formats.
+`txt` writes basic plain text; `txt-ruby` keeps ruby as `{base|reading}`.
+`narou`, `kakuyomu`, and `aozora` target their respective Japanese publishing
+notations. `txt-all` writes all five text variants beside the input without
+overwriting them.
 
 :::note
 PDF output renders through a headless Chromium via

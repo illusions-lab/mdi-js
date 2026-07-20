@@ -23,13 +23,18 @@ mdi build novel.mdi --to epub -o dist/novel.epub
 mdi build novel.mdi --to docx
 mdi build novel.mdi --to txt
 mdi build novel.mdi --to txt-ruby
+mdi build novel.mdi --to narou
+mdi build novel.mdi --to kakuyomu
+mdi build novel.mdi --to aozora
+mdi build novel.mdi --to txt-all
 ```
 
 `-o` を省略すると、入力ファイルと同じ場所にフォーマットの拡張子で
 出力されます（`novel.mdi` → `novel.pdf`）。
 
 `txt` は基本的なプレーンテキスト、`txt-ruby` はルビを `{base|reading}` の形で
-残す出力です。小説家になろう／青空文庫向けの専用形式は、まだ提供していません。
+残す出力です。`narou`、`kakuyomu`、`aozora` は各投稿先向けの記法を出力します。
+`txt-all` は五つのテキスト形式を、互いに上書きせず入力ファイルの隣に出力します。
 
 :::note
 PDF 出力は [Playwright](https://playwright.dev) 経由のヘッドレス Chromium

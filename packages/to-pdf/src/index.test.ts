@@ -42,6 +42,7 @@ describe("PDF export profile", () => {
     expect(html).toContain("@page{size:210mm 297mm;margin:25.4mm 25.4mm 25.4mm 25.4mm}");
     expect(html).not.toContain("body{padding:");
     expect(html).toContain("html{writing-mode:horizontal-tb!important");
+    expect(html).toContain("p+h1,p+h2,p+h3,p+h4,p+h5,p+h6{padding-top:.75em}");
   });
   it("applies margins through @page so every forced page receives them", () => {
     const html = applyPdfProfile(
