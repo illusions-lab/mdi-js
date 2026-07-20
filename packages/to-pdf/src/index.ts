@@ -84,7 +84,7 @@ export function applyPdfProfile(
     typesetting.fontFamily
   )};font-size:${fontSize}mm;line-height:${lineHeight};writing-mode:${writingMode};text-orientation:mixed;color:#000}p{margin:0 0 .75em;text-indent:${
     typesetting.fullwidthSpaceIndent ? "0" : `${typesetting.textIndentEm}em`
-  }}h1,h2,h3,h4,h5,h6{color:#000;break-after:avoid;margin:0 0 .75em;line-height:1.25}h1{font-size:1.6em}h2{font-size:1.35em}h3{font-size:1.15em}a{color:inherit;text-decoration:none}.mdi-pagebreak,.mdi-pagebreak-right,.mdi-pagebreak-left{background:transparent}</style>`;
+  }}h1,h2,h3,h4,h5,h6{color:#000;break-after:avoid;margin:0 0 .75em;line-height:1.25}p+h1,p+h2,p+h3,p+h4,p+h5,p+h6{padding-top:.75em}h1{font-size:1.6em}h2{font-size:1.35em}h3{font-size:1.15em}a{color:inherit;text-decoration:none}.mdi-pagebreak,.mdi-pagebreak-right,.mdi-pagebreak-left{background:transparent}</style>`;
   return html
     .replace("</head>", `${css}</head>`)
     .replace(/(<p(?:\s[^>]*)?>)(?!\s*<\/p>)/g, `$1${fullwidth}`);

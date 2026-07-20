@@ -1,7 +1,9 @@
 import {
   AlignmentType,
   Document,
+  ExternalHyperlink,
   Footer,
+  FootnoteReferenceRun,
   HeadingLevel,
   Header,
   ImportedXmlComponent,
@@ -38,7 +40,15 @@ export async function mdiToDocx(
     profile,
     tree.data?.frontmatter?.writingMode
   );
-  const children = tree.children.flatMap((node) => block(node, options));
+  const definitions = tree.children.filter(
+    (node): node is Extract<RootContent, { type: "footnoteDefinition" }> =>
+      node.type === "footnoteDefinition"
+  );
+  const footnoteIds = new Map(
+    definitions.map((definition, index) => [definition.identifier, index + 1])
+  );
+  const context: DocxContext = { footnoteIds };
+  const children = tree.children.flatMap((node) => block(node, options, context));
   const dimensions = PAGE_DIMENSIONS[options.pagination.pageSize];
   const widthMm = options.pagination.landscape
     ? dimensions.height
@@ -70,6 +80,18 @@ export async function mdiToDocx(
   const document = new Document({
     title: options.metadata.title ?? tree.data?.frontmatter?.title,
     creator: options.metadata.author ?? tree.data?.frontmatter?.author,
+    footnotes: Object.fromEntries(
+      definitions.map((definition, index) => [
+        String(index + 1),
+        {
+          children: definition.children.flatMap((child) =>
+            child.type === "paragraph"
+              ? [new Paragraph({ children: inline(child.children, context) })]
+              : []
+          ),
+        },
+      ])
+    ),
     styles: {
       default: {
         document: {
@@ -226,7 +248,8 @@ function pageNumberSection(
 
 function block(
   node: RootContent,
-  options: ResolvedExportProfile
+  options: ResolvedExportProfile,
+  context: DocxContext
 ): Array<Paragraph | DocxTable> {
   if (node.type === "heading")
     return [
@@ -239,10 +262,10 @@ function block(
           HeadingLevel.HEADING_5,
           HeadingLevel.HEADING_6,
         ][node.depth - 1],
-        children: inline(node.children),
+        children: inline(node.children, context),
       }),
     ];
-  if (node.type === "paragraph") return [paragraph(node.children, options)];
+  if (node.type === "paragraph") return [paragraph(node.children, options, undefined, context)];
   if (node.type === "list")
     return node.children.flatMap((item) =>
       item.children
@@ -251,7 +274,7 @@ function block(
           (n) =>
             new Paragraph({
               style: "MdiList",
-              children: inline(n.children),
+              children: inline(n.children, context),
               bullet: { level: 0 },
             })
         )
@@ -259,8 +282,8 @@ function block(
   if (node.type === "blockquote")
     return node.children.flatMap((child) =>
       child.type === "paragraph"
-        ? [paragraph(child.children, options, "MdiQuote")]
-        : block(child, options)
+        ? [paragraph(child.children, options, "MdiQuote", context)]
+        : block(child, options, context)
     );
   if (node.type === "code")
     return [
@@ -284,7 +307,7 @@ function block(
         children: [new TextRun("— — —")],
       }),
     ];
-  if (node.type === "table") return [tableBlock(node, options)];
+  if (node.type === "table") return [tableBlock(node, options, context)];
   if (node.type === "mdiPagebreak")
     return [new Paragraph({ children: [new PageBreak()] })];
   if (node.type === "mdiBlank") return [new Paragraph("")];
@@ -293,7 +316,8 @@ function block(
 
 function tableBlock(
   node: Extract<RootContent, { type: "table" }>,
-  options: ResolvedExportProfile
+  options: ResolvedExportProfile,
+  context: DocxContext
 ): DocxTable {
   const columns = Math.max(1, ...node.children.map((row) => row.children.length));
   const dimensions = PAGE_DIMENSIONS[options.pagination.pageSize];
@@ -316,10 +340,9 @@ function tableBlock(
                 width: { size: columnWidth, type: WidthType.DXA },
                 children: [
                   new Paragraph({
-                    children:
-                      rowIndex === 0
-                        ? [new TextRun({ bold: true, children: inline(cell.children) })]
-                        : inline(cell.children),
+                    children: rowIndex === 0
+                      ? [new TextRun({ text: inlineText(cell.children), bold: true })]
+                      : inline(cell.children, context),
                   }),
                 ],
               })
@@ -332,7 +355,8 @@ function tableBlock(
 function paragraph(
   nodes: PhrasingContent[],
   options: ResolvedExportProfile,
-  style?: string
+  style: string | undefined,
+  context: DocxContext
 ): Paragraph {
   const fontSizeMm = (() => {
     const dimensions = PAGE_DIMENSIONS[options.pagination.pageSize];
@@ -367,27 +391,39 @@ function paragraph(
                 ),
               }),
         },
-    children: [...prefix, ...inline(nodes)],
+    children: [...prefix, ...inline(nodes, context)],
   });
 }
 
-function inline(nodes: PhrasingContent[]): TextRun[] {
+type InlineChild = TextRun | FootnoteReferenceRun | ExternalHyperlink;
+interface DocxContext { footnoteIds: Map<string, number>; }
+
+function inline(nodes: PhrasingContent[], context: DocxContext): InlineChild[] {
   return nodes.flatMap((node) => {
     if (node.type === "text") return [new TextRun(node.value)];
     if (node.type === "break" || node.type === "mdiBreak")
       return [new TextRun({ break: 1 })];
     if (node.type === "emphasis")
-      return [new TextRun({ italics: true, children: inline(node.children) })];
+      return [new TextRun({ italics: true, children: inline(node.children, context) })];
     if (node.type === "strong")
-      return [new TextRun({ bold: true, children: inline(node.children) })];
+      return [new TextRun({ bold: true, children: inline(node.children, context) })];
     if (node.type === "delete")
-      return [new TextRun({ strike: true, children: inline(node.children) })];
+      return [new TextRun({ strike: true, children: inline(node.children, context) })];
     if (node.type === "inlineCode")
       return [new TextRun({ text: node.value, font: "Courier New" })];
     if (node.type === "image")
       return [new TextRun({ text: node.alt ? `[Image: ${node.alt}]` : "[Image]" })];
-    if (node.type === "footnoteReference")
-      return [new TextRun({ text: `[${node.label ?? node.identifier}]`, superScript: true })];
+    if (node.type === "link")
+      return [
+        new ExternalHyperlink({
+          link: node.url,
+          children: inline(node.children, context),
+        }),
+      ];
+    if (node.type === "footnoteReference") {
+      const id = context.footnoteIds.get(node.identifier);
+      return id ? [new FootnoteReferenceRun(id)] : [];
+    }
     if (node.type === "mdiRuby") return [rawRun(rubyXml(node.base, node.ruby))];
     if (node.type === "mdiTcy")
       return [
@@ -397,9 +433,13 @@ function inline(nodes: PhrasingContent[]): TextRun[] {
           )}</w:t></w:r>`
         ),
       ];
-    if ("children" in node) return inline(node.children as PhrasingContent[]);
+    if ("children" in node) return inline(node.children as PhrasingContent[], context);
     return [];
   });
+}
+
+function inlineText(nodes: PhrasingContent[]): string {
+  return nodes.map((node) => node.type === "text" ? node.value : "children" in node ? inlineText(node.children as PhrasingContent[]) : "").join("");
 }
 
 function mmToTwips(mm: number): number {

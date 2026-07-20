@@ -141,5 +141,6 @@ describe("mdiToEpub edge cases", () => {
     ).toBe(2);
     expect(css).toContain("font-family:Noto Serif JP");
     expect(css).toContain("text-indent:2em");
+    expect(css).toContain("writing-mode:vertical-rl");
   });
 });

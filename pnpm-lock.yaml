@@ -87,6 +87,9 @@ importers:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.43
+      jszip:
+        specifier: ^3.10.1
+        version: 3.10.1
       tsup:
         specifier: ^8.3.0
         version: 8.5.1(postcss@8.5.19)(typescript@5.9.3)(yaml@2.9.0)

@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { build, loadExportProfile, mdiToText, parseArgs } from "./index.js";
+import JSZip from "jszip";
+import { build, loadExportProfile, mdiToText, mdiToTextFormat, parseArgs } from "./index.js";
 import { unified } from "unified";
 import remarkParse from "remark-parse";
 import remarkMdi from "@illusions-lab/mdi-remark";
@@ -75,6 +76,61 @@ describe("text export", () => {
       mdiToText(tree, { text: { fullwidthSpaceIndent: true, indentCount: 2 } })
     ).toBe("題\n　　東京\n\n　　次");
     expect(mdiToText(tree, undefined, true)).toContain("{東京|とうきょう}");
+  });
+
+  it("renders stable golden text for every text target", () => {
+    const processor = unified().use(remarkParse).use(remarkMdi);
+    const tree = processor.runSync(
+      processor.parse(
+        "# 題\n\n{東京|とうきょう}と[[em:強調]]。[^n]\n\n[^n]: 注の本文"
+      )
+    ) as import("mdast").Root;
+    expect(mdiToTextFormat(tree, undefined, "txt")).toBe("題\n東京と強調。");
+    expect(mdiToTextFormat(tree, undefined, "txt-ruby")).toBe(
+      "題\n{東京|とうきょう}と強調。"
+    );
+    expect(mdiToTextFormat(tree, undefined, "narou")).toBe(
+      "題\n｜東京《とうきょう》と強調。［注1］\n\nFootnotes\n1. 注の本文"
+    );
+    expect(mdiToTextFormat(tree, undefined, "kakuyomu")).toBe(
+      "題\n｜東京《とうきょう》と《《強調》》。［注1］\n\nFootnotes\n1. 注の本文"
+    );
+    expect(mdiToTextFormat(tree, undefined, "aozora")).toBe(
+      "題［＃「題」は大見出し］\r\n｜東京《とうきょう》と強調［＃「強調」に傍点］。［注1］\r\n\r\nFootnotes\r\n1. 注の本文"
+    );
+  });
+
+  it("uses non-colliding default filenames for text targets", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mdi-cli-text-names-"));
+    try {
+      const input = join(directory, "kitchen-sink.mdi");
+      await writeFile(input, "text");
+      await expect(build(input, "txt")).resolves.toBe(join(directory, "kitchen-sink.txt"));
+      await expect(build(input, "txt-ruby")).resolves.toBe(join(directory, "kitchen-sink_ruby.txt"));
+      await expect(build(input, "narou")).resolves.toBe(join(directory, "kitchen-sink_narou.txt"));
+      await expect(build(input, "kakuyomu")).resolves.toBe(join(directory, "kitchen-sink_kakuyomu.txt"));
+      await expect(build(input, "aozora")).resolves.toBe(join(directory, "kitchen-sink_aozora.txt"));
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("writes every text target with txt-all", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mdi-cli-text-all-"));
+    try {
+      const input = join(directory, "kitchen-sink.mdi");
+      await writeFile(input, "{東京|とうきょう}");
+      await expect(build(input, "txt-all")).resolves.toEqual([
+        join(directory, "kitchen-sink.txt"),
+        join(directory, "kitchen-sink_ruby.txt"),
+        join(directory, "kitchen-sink_narou.txt"),
+        join(directory, "kitchen-sink_kakuyomu.txt"),
+        join(directory, "kitchen-sink_aozora.txt"),
+      ]);
+      expect(await readFile(join(directory, "kitchen-sink_aozora.txt"), "utf8")).toContain("｜東京《とうきょう》");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });
 
@@ -160,4 +216,45 @@ describe("CLI command output", () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+});
+
+describe("vertical Kitchen Sink export artifacts", () => {
+  it("preserves the full fixture across PDF, DOCX, EPUB, and all text targets", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mdi-cli-vertical-kitchen-"));
+    try {
+      const source = (await readFile(
+        new URL("../../../examples/kitchen-sink.mdi", import.meta.url),
+        "utf8"
+      )).replace("writing-mode: horizontal", "writing-mode: vertical");
+      const input = join(directory, "kitchen-sink.mdi");
+      await writeFile(input, source);
+      const [html, pdf, docx, epub, textOutputs] = await Promise.all([
+        build(input, "html"),
+        build(input, "pdf"),
+        build(input, "docx"),
+        build(input, "epub"),
+        build(input, "txt-all"),
+      ]);
+      const htmlOutput = await readFile(html, "utf8");
+      expect(htmlOutput).toContain("writing-mode: vertical-rl");
+      expect(htmlOutput).toContain('<ruby class="mdi-ruby">');
+      expect(htmlOutput).toContain("data-footnotes");
+      expect((await readFile(pdf)).subarray(0, 5).toString()).toBe("%PDF-");
+      const docxZip = await JSZip.loadAsync(await readFile(docx));
+      const document = await docxZip.file("word/document.xml")!.async("string");
+      expect(document).toContain('w:textDirection w:val="tbRl"');
+      expect(document).toContain("<w:ruby ");
+      expect(document).toContain("<w:eastAsianLayout");
+      expect(document).toContain('<w:footnoteReference w:id="1"/>');
+      expect(await docxZip.file("word/footnotes.xml")!.async("string")).toContain("後に事実と判明する。");
+      const epubZip = await JSZip.loadAsync(await readFile(epub));
+      expect(await epubZip.file("OEBPS/style.css")!.async("string")).toContain("writing-mode:vertical-rl");
+      expect(await epubZip.file("OEBPS/package.opf")!.async("string")).toContain('page-progression-direction="rtl"');
+      expect(textOutputs).toHaveLength(5);
+      expect(await readFile(join(directory, "kitchen-sink_ruby.txt"), "utf8")).toContain("{東京|とうきょう}");
+      expect(await readFile(join(directory, "kitchen-sink_aozora.txt"), "utf8")).toContain("｜東京《とうきょう》");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 60_000);
 });

@@ -70,6 +70,23 @@ describe("DOCX print defaults", () => {
       /w:styleId="Heading1"[\s\S]*?w:color w:val="000000"/
     );
   });
+
+  it("keeps vertical writing, ruby, tcy, and footnotes in one real DOCX package", async () => {
+    const zip = await JSZip.loadAsync(
+      await mdiToDocx(
+        parse(
+          "---\nwriting-mode: vertical\n---\n{東京|とうきょう}^12^脚注[^n]\n\n[^n]: 縦書きの脚注"
+        )
+      )
+    );
+    const document = await zip.file("word/document.xml")!.async("string");
+    const footnotes = await zip.file("word/footnotes.xml")!.async("string");
+    expect(document).toContain('w:textDirection w:val="tbRl"');
+    expect(document).toContain("<w:ruby ");
+    expect(document).toContain("<w:eastAsianLayout");
+    expect(document).toContain('<w:footnoteReference w:id="1"/>');
+    expect(footnotes).toContain("縦書きの脚注");
+  });
 });
 
 describe("mdiToDocx edge cases", () => {
@@ -99,8 +116,14 @@ describe("mdiToDocx edge cases", () => {
     const document = await zip.file("word/document.xml")!.async("string");
     expect(document).toContain("code");
     expect(document).toContain("link text");
+    expect(await zip.file("word/_rels/document.xml.rels")!.async("string")).toContain(
+      'Target="https://example.com" TargetMode="External"'
+    );
     expect(document).toContain("[Image: diagram]");
-    expect(document).toContain("[a]");
+    expect(document).toContain('<w:footnoteReference w:id="1"/>');
+    expect(await zip.file("word/footnotes.xml")!.async("string")).toContain(
+      "definition"
+    );
   });
 
   it("maps quotes, fenced code, and thematic breaks to their print styles", async () => {
