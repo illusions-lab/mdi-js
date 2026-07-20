@@ -1,12 +1,12 @@
 ---
 title: ライブ・ショーケース
-description: MDI 2.0 の全構文を、このサイト自身が MDI のパーサでライブ描画します。
+description: MDI 2.0 の全構文を、このサイト自身が Rust mdi-core で解析し、ライブ描画します。
 ---
 
-以下の例はすべて**このドキュメントサイト自身が描画しています** —
-ページの markdown は `micromark-extension-mdi` + `mdast-util-mdi` を
-通り、出力は `@illusions-lab/mdi-to-hast` 同梱のスタイルシートで
-装飾されます。見えているものが、コンバータの出力そのものです。
+以下の例はすべて**このドキュメントサイト自身が描画しています**。ページの
+Markdown ソース全体を `@illusions-lab/mdi` から Rust の `mdi-core` に渡して
+解析し、文書 IR から HTML を生成して MDI のスタイルシートを適用しています。
+表示されている内容が、renderer の実際の出力です。
 
 構文の正式な定義は
 [MDI 2.0 仕様書](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md)

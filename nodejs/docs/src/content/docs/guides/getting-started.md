@@ -1,20 +1,25 @@
 ---
 title: Getting Started
-description: Install the MDI Node.js packages, parse a .mdi file, and convert it to HTML, PDF, EPUB, DOCX, or plain text.
+description: Parse a complete MDI document with Rust and render it to HTML, PDF, EPUB, DOCX, or plain text.
 ---
 
-This is a family of Node.js packages for **illusion Markdown (MDI)** — a Markdown
-dialect for Japanese novel typesetting. This page walks through the two ways to
-use it: the CLI and the programmatic API.
+MDI is a Markdown dialect for Japanese novel typesetting. Its parser and
+renderers live in Rust; the CLI and JavaScript package are interfaces to the
+same `mdi-core` engine.
 
-This toolchain targets **MDI 2.0**
-([specification](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md)).
+This toolchain implements **MDI 2.0**, whose normative human-readable
+definition is the
+[`SYNTAX.md` specification](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md).
 
-## The fast path: CLI
+## Command line
+
+Install the CLI:
 
 ```bash
 npm install --global @illusions-lab/mdi-cli
 ```
+
+Then build any supported output from the same `.mdi` source:
 
 ```bash
 mdi build novel.mdi --to html
@@ -29,58 +34,87 @@ mdi build novel.mdi --to aozora
 mdi build novel.mdi --to txt-all
 ```
 
-Without `-o`, the output file is written next to the input with the format's
-extension (`novel.mdi` → `novel.pdf`).
+Without `-o`, output is written beside the input using the output format's
+extension (`novel.mdi` becomes `novel.pdf`, for example).
 
-`txt` writes basic plain text; `txt-ruby` keeps ruby as `{base|reading}`.
-`narou`, `kakuyomu`, and `aozora` target their respective Japanese publishing
-notations. `txt-all` writes all five text variants beside the input without
-overwriting them.
+`txt` emits basic plain text, while `txt-ruby` retains ruby as
+`{base|reading}`. `narou`, `kakuyomu`, and `aozora` target their respective
+Japanese publishing notations. `txt-all` writes all text variants without
+overwriting one with another.
 
 :::note
-PDF output renders through a headless Chromium via
-[Playwright](https://playwright.dev) — that is what makes `vertical-rl`,
-`text-combine-upright`, and `text-emphasis` come out correctly. On first use
-you may need to install the browser once: `npx playwright install chromium`.
+PDF layout is performed by Chromium, but Rust owns the operation end to end.
+It renders HTML and print CSS, starts an isolated Chromium process, calls
+`printToPDF` over the Chrome DevTools Protocol, and returns the PDF bytes.
+Chromium never parses MDI or decides document semantics.
 :::
 
-## The programmatic path
+## JavaScript
 
-Parse with `@illusions-lab/mdi-remark` (one plugin bundling GFM, YAML front
-matter, and the MDI extensions), then hand the tree to any converter:
+Install the primary package:
 
 ```bash
-npm install unified remark-parse @illusions-lab/mdi-remark @illusions-lab/mdi-to-html
+npm install @illusions-lab/mdi
 ```
+
+Pass the complete source document to `parse`:
 
 ```js
 import { readFile } from 'node:fs/promises';
-import { unified } from 'unified';
-import remarkParse from 'remark-parse';
-import remarkMdi from '@illusions-lab/mdi-remark';
-import { mdiToHtml } from '@illusions-lab/mdi-to-html';
+import { parse } from '@illusions-lab/mdi';
 
 const source = await readFile('novel.mdi', 'utf8');
-const processor = unified().use(remarkParse).use(remarkMdi);
-const tree = await processor.run(processor.parse(source));
+const result = parse(source);
 
-const html = mdiToHtml(tree); // complete HTML document, stylesheet inlined
+console.log(result.syntaxVersion);
+console.log(result.irVersion);
+console.log(result.document);
+console.log(result.diagnostics);
 ```
 
-The other converters have the same shape and are picked per output format:
+`mdi-core` parses front matter, CommonMark, GFM, and MDI extensions together.
+JavaScript does not pre-tokenize the source or run a separate Markdown parser.
+Every source-backed node has a half-open UTF-8 byte span, and recoverable
+problems are reported as diagnostics with stable codes and source spans.
+
+Ordinary malformed syntax returns a usable document plus diagnostics. Reserve
+`try`/`catch` for programming errors and unavailable system resources.
+
+## Render the document
+
+Parse once and pass the returned document to any renderer:
 
 ```js
-import { mdiToPdf } from '@illusions-lab/mdi-to-pdf';   // Promise<Buffer>
-import { mdiToEpub } from '@illusions-lab/mdi-to-epub'; // Promise<Buffer>
-import { mdiToDocx } from '@illusions-lab/mdi-to-docx'; // Promise<Buffer>
+import {
+  parse,
+  renderHtml,
+  renderText,
+  renderEpub,
+  renderDocx,
+  renderPdf,
+} from '@illusions-lab/mdi';
+
+const { document, diagnostics } = parse(source);
+
+const html = renderHtml(document);
+const text = renderText(document, 'plain');
+const epub = renderEpub(document);
+const docx = renderDocx(document);
+const pdf = await renderPdf(document);
 ```
 
-All four consume the **same mdast tree** — parse once, convert to any format.
+HTML and text return strings. EPUB, DOCX, and PDF return byte arrays. Export
+profiles can be supplied to the renderer calls to select metadata, typography,
+page geometry, fonts, and format-specific options.
+
+All deterministic rendering semantics are implemented in Rust. PDF is the one
+format that additionally needs an available Chromium executable. Browser
+WebAssembly cannot launch Chromium, so browser applications request PDF from a
+server or desktop host running the same Rust API.
 
 ## Front matter
 
-A `.mdi` file can open with YAML front matter; `remarkMdi` resolves it (with
-spec defaults) onto `tree.data.frontmatter`:
+An `.mdi` document can begin with YAML front matter:
 
 ```yaml
 ---
@@ -88,34 +122,38 @@ mdi: "2.0"
 title: 吾輩は猫である
 author: 夏目漱石
 lang: ja
-writing-mode: vertical # or horizontal (default)
-page-progression: rtl  # defaults follow writing-mode
+writing-mode: vertical
+page-progression: rtl
 ---
 ```
 
-Converters read it for document metadata: HTML gets `<title>`, `lang`, and
-vertical `writing-mode`; EPUB gets OPF metadata; DOCX gets document properties
-and vertical section layout.
+Parsed front matter is part of the versioned document IR. Key order and
+unknown keys are preserved. Renderers use the normalized metadata for such
+things as the HTML title and language, EPUB package metadata, DOCX document
+properties, writing direction, and page progression.
 
-## Integrating with an existing remark/rehype pipeline
+## Remark and unified
 
-If you already have a unified pipeline (this docs site is one), you don't need
-the converters — register the syntax extensions and the hast handlers directly:
+Remark is optional. Use it only when an application needs existing unified
+plugins. `@illusions-lab/mdi-remark` converts between the Rust document IR and
+mdast; it is not an MDI parser.
 
 ```js
-import { mdi } from 'micromark-extension-mdi';
-import { mdiFromMarkdown } from 'mdast-util-mdi';
-import { mdiHandlers } from '@illusions-lab/mdi-to-hast';
+import { parse, renderHtml } from '@illusions-lab/mdi';
+import { toMdast, fromMdast } from '@illusions-lab/mdi-remark';
 
-function remarkMdiSyntax() {
-	const data = this.data();
-	(data.micromarkExtensions ??= []).push(mdi());
-	(data.fromMarkdownExtensions ??= []).push(mdiFromMarkdown());
-}
+const parsed = parse(source);
+const tree = toMdast(parsed.document);
+
+// Run unified plugins over `tree` here.
+
+const converted = fromMdast(tree);
+const html = renderHtml(converted.document);
 ```
 
-Then pass `remarkMdiSyntax` as a remark plugin and `mdiHandlers` as
-`remark-rehype` handlers, and include the stylesheet
-(`@illusions-lab/mdi-to-hast/mdi.css` or the exported `MDI_STYLESHEET`
-string). See [Architecture](/MDI/guides/architecture/) for how the packages
-fit together.
+The adapter contains no tokenizer, grammar rules, or syntax fallback. When an
+mdast tree is converted back, Rust validates it and creates the document IR
+used by serializers and renderers.
+
+See [Architecture](/MDI/guides/architecture/) for the complete ownership and
+wire-contract rules.

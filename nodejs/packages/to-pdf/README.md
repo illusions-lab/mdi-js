@@ -1,6 +1,8 @@
 # @illusions-lab/mdi-to-pdf
 
-Renders @illusions-lab/mdi-to-html output to PDF via a headless browser (Playwright print-to-PDF), for correct vertical-rl / text-combine-upright / text-emphasis support.
+JavaScript binding for the Rust PDF pipeline. Rust renders HTML and print CSS,
+controls an isolated Chromium process over the Chrome DevTools Protocol, and
+returns PDF bytes. Chromium performs layout but never parses MDI.
 
 Part of the [MDI](https://github.com/illusions-lab/MDI) monorepo. See the root README for the full package architecture.
 

@@ -1,9 +1,9 @@
 ---
 title: MDI
-description: illusion Markdown (MDI) 的 Node.js 工具鏈 — 解析 .mdi 檔案並轉換為 HTML、PDF、EPUB、DOCX。
+description: 由 Rust 驅動的 illusion Markdown (MDI) 工具鏈 — 所有平台共用一個解析器與一致輸出。
 template: splash
 hero:
-  tagline: illusion Markdown (MDI) 的 Node.js 工具鏈 — 解析 .mdi 檔案並轉換為 HTML、PDF、EPUB、DOCX。
+  tagline: illusion Markdown (MDI) 的單一 Rust 解析器，以及一致的 HTML、PDF、EPUB、DOCX、文字輸出。
   actions:
     - text: 快速上手
       link: /MDI/zh-tw/guides/getting-started/
@@ -17,21 +17,21 @@ hero:
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
 <CardGrid stagger>
-	<Card title="一棵樹，四種輸出" icon="seti:html">
-		所有轉換器都消費 `@illusions-lab/mdi-remark` 產生的同一棵 mdast
-		樹，編輯器路徑與匯出路徑的行為永不分歧。HTML、PDF、EPUB 共享同一套
-		mdast → hast 映射；DOCX 直接映射到原生 OOXML。
+	<Card title="唯一真相來源" icon="seti:rust">
+		`mdi-core` 把 CommonMark、GFM、front matter 與所有 MDI 語法解析成
+		一份有版本的文件 IR。每個接口和輸出器都使用完全相同的語法判斷。
 	</Card>
 	<Card title="貨真價實的日文排版" icon="translate">
 		ルビ（注音假名）、縦中横、傍點、割注、字距調整、直書 — 全部作為
 		第一級語法解析，不是後處理補丁。看看[即時渲染展示](/MDI/zh-tw/syntax/showcase/)：
 		本網站就是用 MDI 自己的解析器渲染 MDI 的。
 	</Card>
-	<Card title="建立在 unified 之上" icon="puzzle">
-		micromark 語法擴充與 mdast 工具可直接插入任何既有的 remark/rehype
-		管線 — 包括產生這個頁面的那一條。
+	<Card title="薄語言接口" icon="puzzle">
+		JavaScript、Python、Swift 提供同一組 Rust API，不攜帶另一套 tokenizer。
+		需要 unified 管線時，可用 remark adapter 取得 mdast。
 	</Card>
 	<Card title="附帶 CLI" icon="seti:shell">
-		`mdi build novel.mdi --to pdf` — 從書稿到交付檔一行指令。
+		`mdi build novel.mdi --to pdf` — 一行指令把書稿送入由 Rust 控制的
+		Chromium PDF 管線。
 	</Card>
 </CardGrid>

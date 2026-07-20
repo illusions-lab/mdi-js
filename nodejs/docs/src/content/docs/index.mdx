@@ -1,9 +1,9 @@
 ---
 title: MDI
-description: Node.js tooling for illusion Markdown (MDI) — parse .mdi files and convert them to HTML, PDF, EPUB, and DOCX.
+description: Rust-powered tooling for illusion Markdown (MDI) — one parser and consistent output across every platform.
 template: splash
 hero:
-  tagline: Node.js tooling for illusion Markdown (MDI) — parse .mdi files and convert them to HTML, PDF, EPUB, and DOCX.
+  tagline: One Rust parser for illusion Markdown (MDI), with consistent HTML, PDF, EPUB, DOCX, and text output.
   actions:
     - text: Getting Started
       link: /MDI/guides/getting-started/
@@ -17,11 +17,10 @@ hero:
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
 <CardGrid stagger>
-	<Card title="One tree, four outputs" icon="seti:html">
-		Every converter consumes the same mdast tree produced by
-		`@illusions-lab/mdi-remark`, so editor-path and export-path behavior
-		never diverge. HTML, PDF, and EPUB share one mdast → hast mapping;
-		DOCX maps to native OOXML directly.
+	<Card title="One source of truth" icon="seti:rust">
+		`mdi-core` parses CommonMark, GFM, front matter, and every MDI
+		construct into one versioned document IR. Every binding and renderer
+		observes the same syntax decisions.
 	</Card>
 	<Card title="Japanese typography, for real" icon="translate">
 		Ruby (ルビ), tate-chu-yoko (縦中横), boten (傍点), warichu
@@ -29,13 +28,13 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 		not post-processing hacks. See the [live showcase](/MDI/syntax/showcase/):
 		this site renders MDI with its own parser.
 	</Card>
-	<Card title="Built on unified" icon="puzzle">
-		A micromark syntax extension and mdast utility slot straight into any
-		existing remark/rehype pipeline — including the one that built this
-		page.
+	<Card title="Thin language interfaces" icon="puzzle">
+		JavaScript, Python, and Swift expose the same Rust API without carrying
+		another tokenizer. A remark adapter is available when a unified pipeline
+		needs mdast.
 	</Card>
 	<Card title="CLI included" icon="seti:shell">
-		`mdi build novel.mdi --to pdf` — one command from manuscript to
-		deliverable.
+		`mdi build novel.mdi --to pdf` — one command from manuscript to a
+		Rust-controlled Chromium PDF pipeline.
 	</Card>
 </CardGrid>

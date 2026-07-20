@@ -1,12 +1,11 @@
 ---
 title: 即時渲染展示
-description: MDI 2.0 的全部語法，由本網站用 MDI 自己的解析器即時渲染。
+description: MDI 2.0 的全部語法，由本網站透過 Rust mdi-core 即時解析並渲染。
 ---
 
-下面每個範例都是**本文檔網站自己渲染出來的** — 頁面的 markdown 經過
-`micromark-extension-mdi` + `mdast-util-mdi` 解析，輸出由
-`@illusions-lab/mdi-to-hast` 附帶的樣式表裝飾。你看到的就是轉換器
-實際產出的東西。
+下面每個範例都是**本文檔網站自己渲染出來的**。頁面的完整 Markdown 原始碼
+透過 `@illusions-lab/mdi` 交給 Rust `mdi-core` 解析，再由文件 IR 產生 HTML
+並套用 MDI 樣式表。你看到的就是 renderer 實際產出的結果。
 
 語法的正式定義在
 [MDI 2.0 規範](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md)；

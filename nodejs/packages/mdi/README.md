@@ -1,24 +1,83 @@
 # `@illusions-lab/mdi`
 
-Thin JavaScript binding for the Rust-authoritative MDI parser.
+The JavaScript interface to the Rust-authoritative MDI engine. Give it a
+complete `.mdi` source document and it returns the versioned document IR and
+diagnostics produced by `mdi-core`.
 
 ```ts
-import { parseMdiSyntax } from "@illusions-lab/mdi";
+import { parse } from "@illusions-lab/mdi";
 
-const result = parseMdiSyntax("第^12^話");
-console.log(result.document.blocks);
+const result = parse(`---
+title: 短篇
+---
+
+# 第一章
+
+第^12^話に[[em:傍点]]を付ける。`);
+
+console.log(result.document);
+console.log(result.diagnostics);
 ```
 
-## Stage-1 scope
+## What the binding does
 
-`parseMdiSyntax` exposes the current Rust MDI-only syntax tree. The returned
-`capabilities` object explicitly reports that CommonMark, GFM, front matter,
-and source spans are not integrated yet. The future whole-document `parse`
-API will only be added when those features are owned by Rust as well.
+The package has deliberately narrow responsibilities:
 
-This package contains no MDI grammar rules. It validates the host-language
-argument, calls the generated WebAssembly binding, checks the IR version, and
-returns typed JavaScript objects.
+1. accept JavaScript strings, byte arrays, and options;
+2. call `mdi-core` through the generated Rust binding;
+3. check the returned IR schema version;
+4. expose typed JavaScript objects, diagnostics, and renderer results.
 
-The existing remark/micromark packages remain temporarily available as the
-differential-test oracle during migration. They are not used by this API.
+It does not tokenize Markdown or MDI, repair malformed syntax, reinterpret
+source spans, or maintain a JavaScript copy of the grammar. CommonMark, GFM,
+front matter, MDI extensions, escapes, nesting, literal fallback, and all
+syntax validation are decided by Rust.
+
+```text
+complete source
+      ↓
+JavaScript binding
+      ↓
+mdi-core parser
+      ↓
+versioned document IR + diagnostics
+```
+
+## Parse result
+
+Every result carries the syntax version and IR schema version alongside the
+document. Source-backed nodes use half-open UTF-8 byte spans. Recoverable
+problems are returned as ordered diagnostics with stable codes, severity,
+messages, and source spans.
+
+Applications should treat the IR version as a wire-protocol version. They
+must not infer grammar rules from object shapes or silently accept an
+unsupported version.
+
+## Rendering
+
+Rendering starts from the same Rust IR. Canonical MDI, plain text, HTML, EPUB,
+and DOCX renderers execute in Rust and are exposed through this package.
+PDF rendering is also orchestrated by Rust: `mdi-core` produces HTML and print
+CSS, controls an isolated Chromium process over CDP, and returns the resulting
+PDF bytes. JavaScript does not parse the document again before rendering.
+
+Browser WebAssembly cannot start Chromium. Browser code sends the document or
+IR to a server or desktop host when it needs PDF output.
+
+## Remark compatibility
+
+Remark support is an optional adapter between Rust IR and mdast. It exists for
+applications that need unified plugins:
+
+```text
+source → mdi-core → Rust IR ⇄ mdast → unified plugins
+```
+
+The adapter contains no tokenizer, grammar, or syntax fallback. When an mdast
+pipeline needs MDI output, it is converted back to Rust IR and Rust performs
+validation and serialization.
+
+The normative human-readable syntax is defined in
+[`SYNTAX.md`](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md). The
+executable syntax authority is `mdi-core`.

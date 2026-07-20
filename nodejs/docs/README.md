@@ -5,7 +5,7 @@ The MDI Node.js tooling documentation site — [Astro Starlight](https://starlig
 MDI の Node.js ツール群のドキュメントサイトです。`main` への push 時に GitHub Pages へ自動デプロイされます。
 
 - Locales: English (root), 日本語 (`ja/`), 正體中文 (`zh-tw/`)
-- MDI syntax in these pages is rendered live by `micromark-extension-mdi` + `mdast-util-mdi` + `mdiHandlers` (see `astro.config.mjs`)
+- MDI syntax in these pages is parsed by `mdi-core` through `@illusions-lab/mdi`; the docs integration adapts the Rust document IR for Astro rendering (see `astro.config.mjs`)
 - API reference pages are generated from TSDoc by `starlight-typedoc` on every build — do not edit them by hand
 
 ```bash

@@ -1,12 +1,12 @@
 ---
 title: Live Showcase
-description: Every MDI 2.0 construct, rendered live by this site using its own MDI parser.
+description: Every MDI 2.0 construct, parsed by mdi-core and rendered live by this site.
 ---
 
-Every example below is **rendered by this documentation site itself** — the
-page's markdown runs through `micromark-extension-mdi` + `mdast-util-mdi`, and
-the output is styled by the stylesheet shipped in
-`@illusions-lab/mdi-to-hast`. What you see is what the converters produce.
+Every example below is **rendered by this documentation site itself**. The
+complete page source is parsed by Rust through `@illusions-lab/mdi`, and the
+resulting document IR is rendered with the same HTML semantics exposed to
+applications. What you see is what the MDI renderer produces.
 
 The full syntax definition lives in the
 [MDI 2.0 specification](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md);

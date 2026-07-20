@@ -1,81 +1,161 @@
 ---
 title: 架構
-description: Rust 作為唯一語法權威、薄語言接口，以及共享轉換器。
+description: Rust 是 MDI 唯一的可執行語法權威；各語言套件只提供薄介面。
 ---
 
-## 一個解析器，多種語言接口
+一份 `.mdi` 文件的完整語義全部由 Rust 決定。`mdi-core` 解析 CommonMark、
+GFM、front matter 與 MDI，產生有明確版本、與程式語言無關的文件 IR。JavaScript、
+Python、Swift 等套件只負責把同一套 Rust 實作接到各自的生態系。
 
-MDI 正在遷移到 Rust 單一權威架構。完整的 `.mdi` 文件——CommonMark、
-GFM、front matter 與 MDI 擴充——只在 Rust 解析一次，產生有版本的語言中立
-文件 IR。
+## 語法權威
+
+MDI 有三項互相補足的事實來源：
+
+1. [`SYNTAX.md`](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md)
+   是供人閱讀的規範性語言規格。
+2. `mdi-core` 是這份規格唯一的可執行實作。
+3. 共用的 conformance fixtures 定義可觀察的語法樹、diagnostics 與輸出結果。
+
+JavaScript、Python、Swift、CLI、編輯器與 renderer 都不得自行辨認、修復或驗證
+MDI 語法。Ruby 分組、巢狀 macro 邊界、escape 與合法 `kern` 數值等規則只在
+Rust 實作一次。
+
+## 系統架構
 
 ```text
-.mdi 原始碼
-    ↓
-Rust parser → MDI 文件 IR → Rust renderers
-    │               │              ├─ HTML / TXT / EPUB / DOCX
-    │               │              └─ HTML/CSS → Chromium → PDF
-    │               └─ mdast 相容 adapter
-    └─ JavaScript / Python / Swift bindings
+                               .mdi 原始碼
+                                    │
+                                    ▼
+                    ┌─────────────────────────────┐
+                    │ mdi-core                    │
+                    │ CommonMark + GFM + MDI      │
+                    │ front matter + diagnostics  │
+                    └──────────────┬──────────────┘
+                                   │
+                           有版本的 MDI 文件 IR
+                                   │
+             ┌─────────────────────┼──────────────────────┐
+             │                     │                      │
+             ▼                     ▼                      ▼
+       Rust renderers         各語言 bindings        生態系 adapters
+       MDI/TXT/HTML/           JS/Python/Swift         mdast/remark
+       EPUB/DOCX               （不含語法）            （不含語法）
+             │
+             └── HTML + 列印 CSS ──▶ Chromium ──▶ PDF
 ```
 
-JavaScript、Python、Swift 接口只轉換字串、bytes、錯誤與物件形狀，不得
-辨認或校驗語法。合法 `kern` 數值、巢狀 bracket macro 的結尾等規則，只能
-存在於 Rust。
-
-人類可讀的 [`SYNTAX.md`](https://github.com/illusions-lab/MDI/blob/main/SYNTAX.md)、
-Rust 參考解析器與共享 conformance fixtures 共同定義契約。
-
-## 為什麼 Rust 必須解析整份文件
-
-MDI 的邊界依賴 Markdown 上下文：
+`mdi-core` 必須解析完整文件，因為 MDI 的邊界取決於 Markdown 上下文，不能在隔離
+的文字片段上安全地進行第二次掃描：
 
 ```markdown
-`^12^`                 <!-- code 裡保持 literal -->
-**第^12^話**           <!-- MDI 位於 strong 裡 -->
-[[em:**重要**]]        <!-- MDI 裡包含 Markdown -->
+`^12^`                 <!-- code 裡保持純文字 -->
+**第^12^話**           <!-- strong 裡可以有 MDI -->
+[[em:**重要**]]        <!-- MDI 結構裡可以有 Markdown -->
 ```
 
-若各宿主語言各自解析 CommonMark，它們仍會決定一部分 MDI 邊界。因此目標
-解析器會同時負責 CommonMark/GFM 與 MDI。
+因此，CommonMark、GFM、front matter 與 MDI 構成一套由 Rust 掌管的文法，
+並產生同一棵語法樹。
 
-## 轉換器
+## `mdi-core` 契約
 
-HTML 與文字輸出是可確定重現的序列化，放在 Rust。EPUB 是 XHTML、CSS、
-metadata 與 ZIP，也共享同一份 Rust IR。DOCX 等核心格式穩定後再移動，
-因為 Word 的原生 ruby、直書與縱中橫需要更多整合測試。
+原生 Rust API 與所有語言綁定都提供相同概念的功能：
 
-PDF 刻意使用真正的瀏覽器。Rust 產生 HTML 與列印 CSS、啟動 Chromium、
-呼叫 `printToPDF` 並回傳 bytes。`vertical-rl`、縱中橫、傍點、ruby、字型
-shaping 與分頁由 Chromium 排版；MDI 不在 Rust 重造瀏覽器排版引擎。
+```text
+parse(source, options) -> ParseResult
+validate(document, options) -> diagnostics
+normalize(document, options) -> document
+serializeMdi(document, options) -> string
+renderHtml(document, profile) -> string
+renderText(document, flavor, profile) -> string
+renderEpub(document, profile) -> bytes
+renderDocx(document, profile) -> bytes
+renderPdf(document, profile) -> bytes
+```
 
-瀏覽器 WASM 無法啟動本機 process，因此瀏覽器端的 PDF 需交給後端或桌面
-host 產生。
+`parse` 接收完整的 UTF-8 原始碼，不需要宿主語言提供 Markdown parser。一般的
+格式錯誤會產生可用的語法樹與 diagnostics；只有程式設計錯誤或系統資源不可用
+才會拋出 exception。
 
-## JavaScript API 與 remark 相容性
+### 文件 IR
 
-`@illusions-lab/mdi` 是新的薄 JavaScript binding。第一階段提供
-`parseMdiSyntax`，回傳帶版本與 capability flags 的 Rust IR。目前 flags
-會明確表示 CommonMark/GFM/front matter 與 source spans 尚未整合；只有在
-完整文件解析都由 Rust 負責後，才會加入通用的 `parse` API。
+公開 IR 與程式語言無關，並具有明確的 schema 版本。其內容包括：
 
-現有 micromark/remark parser 暫時保留作差異測試的 oracle，不是第二套長期
-實作。未來 Astro 或 unified 使用者若需要 mdast，則由相容 adapter 把 Rust
-IR 映射成 mdast；adapter 不得判斷語法。
+- MDI 語法版本與 IR schema 版本；
+- 位於同一棵樹中的 CommonMark、GFM、front matter 與 MDI 型別化 nodes；
+- 每個源自輸入內容的 node 所對應的半開 UTF-8 byte span；
+- 保留原始順序與未知 keys 的 front matter；
+- 文件 metadata 與 footnote 關係；
+- 具有穩定代碼、嚴重程度與來源位置的可恢復 diagnostics；
+- 足以支援標準化 `.mdi` 序列化及編輯器功能的來源資訊。
 
-## 遷移順序
+Block model 包含 paragraph、heading、block quote、list、code、thematic break、
+HTML、table、footnote definition、blank paragraph、page break 與 block
+alignment。Inline model 包含 text、emphasis、strong、deletion、link、image、
+code、HTML、footnote reference、line break、ruby、縱中橫、傍點、no-break、
+warichu 與 kerning。
 
-1. 版本化 IR 契約與 typed JavaScript binding。
-2. 完整 Rust CommonMark/GFM/MDI/front-matter parser 與 source spans。
-3. Rust normalization、validation、repair 與標準 `.mdi` 序列化。
-4. Rust TXT、HTML、EPUB renderers。
-5. Rust DOCX renderer 與由 Rust 控制 Chromium 的 PDF 管線。
-6. 在同一組 API 上增加 Python、Swift bindings。
+Rust enum 是內部實作細節。FFI 交換的是穩定的 wire representation，各語言
+綁定再將它轉成慣用的宿主物件。若 wire schema 發生不相容變更，IR 版本也必須
+提升。
 
-完整權責和目前遷移狀態見 repository 的
+### 解析不變條件
+
+- Code span、fenced code 與 raw context 中看似 MDI 的內容保持純文字。
+- `SYNTAX.md` 允許時，MDI container 裡可以巢狀使用 CommonMark。
+- 符合條件的 CommonMark inline container 裡可以出現 MDI node。
+- 無效或未配對的 MDI delimiter 依 `SYNTAX.md` 的規則退回純文字，也可以產生
+  diagnostic。
+- 所有 offset 都是相對於原始輸入的 UTF-8 byte offset。
+- 相同的原始碼與選項在每個平台都必須產生相同的 IR 與 diagnostics。
+
+## 輸出
+
+所有可重現的轉換都在 Rust 中完成：
+
+| 輸出 | 實作方式 |
+|---|---|
+| 標準化 MDI | Rust serializer |
+| 各種 TXT | Rust renderer |
+| HTML | Rust HTML/CSS renderer |
+| EPUB | Rust XHTML、metadata、CSS 與 ZIP packager |
+| DOCX | Rust OOXML 與 ZIP packager |
+| PDF | Rust HTML/列印 CSS renderer 與 Chromium controller |
+
+PDF 刻意使用 Chromium 作為排版引擎。Rust 尋找或接收 Chromium 執行檔、啟動
+隔離的 process、透過 Chrome DevTools Protocol 呼叫 `printToPDF`，並回傳 PDF
+bytes。日文直書、ruby、縱中橫、傍點、字型 shaping 與分頁由 Chromium 負責；
+Chromium 不解析 MDI，也不決定文件語義。
+
+瀏覽器中的 WebAssembly 無法啟動 process。解析與可重現的 renderer 仍在本機
+執行；PDF 則由後端或桌面 host 透過同一個 Rust PDF API 產生。
+
+## 各語言綁定與 adapters
+
+| 宿主環境 | 介面 |
+|---|---|
+| Rust | 原生 crate API |
+| 瀏覽器 JavaScript | WebAssembly |
+| Node.js | 遵循相同 wire contract 的原生或 WebAssembly binding |
+| Python | PyO3 |
+| Swift | UniFFI，或封裝成 XCFramework 的小型 C ABI |
+
+綁定可以轉換字串、bytes、errors、options 與物件形狀，但不得包含 grammar
+tables、tokenizer、語法 fallback 或 renderer 語義。
+
+Remark 是選用的生態系 adapter。它在 Rust 文件 IR 與 mdast 之間進行映射，
+讓 unified plugins 能參與工作流程，但不解析 MDI，也不改變任何 MDI 邊界判定。
+主要 JavaScript API 直接呼叫 Rust，不依賴 remark。
+
+## 合規條件
+
+一項實作只有在符合下列所有條件時，才屬於 MDI 的一部分：
+
+- 每個語法入口都把完整原始碼交給 `mdi-core`；
+- 所有公開解析結果都聲明所使用的語法版本與 IR 版本；
+- 每個語言綁定都原樣通過共用的解析及 diagnostic fixtures；
+- 每個可重現的 renderer 都以 Rust IR 為輸入；
+- PDF 使用由 Rust IR 產生的 HTML/CSS，並由 Rust 負責協調；
+- 宿主語言套件中不存在另一套 MDI tokenizer 或 parser。
+
+完整契約見 repository 根目錄的
 [`ARCHITECTURE.md`](https://github.com/illusions-lab/MDI/blob/main/ARCHITECTURE.md)。
-
-## 版本策略
-
-套件版本是 `<MDI 規範版本>.<發佈次數>`：major.minor 永遠等於對應的 MDI
-規範版本，patch 是各套件獨立、從 `.1` 開始的發佈計數。

@@ -1,123 +1,75 @@
 # MDI architecture
 
-This document describes the architecture MDI is moving toward. It deliberately
-separates the public contract from temporary implementation details so that a
-JavaScript, Python, or Swift user can understand which component decides what.
+This document defines the completed MDI product architecture. It specifies
+observable ownership and behavior, independent of internal module layout.
 
-> **Short version:** Rust is the only executable authority for MDI syntax and
-> document semantics. Language packages are thin bindings. Deterministic
-> renderers also live in Rust. PDF is orchestrated by Rust but laid out by
-> Chromium, because a browser already implements the Japanese text layout that
-> MDI needs.
+> **In one sentence:** Rust owns the complete meaning of an `.mdi` document;
+> every language package is a thin interface to that implementation.
 >
-> **簡短說明：** Rust 是 MDI 語法與文件語義唯一的可執行權威；JavaScript、
-> Python、Swift 套件都只是薄接口。可確定重現的轉換器也放在 Rust。
-> PDF 流程由 Rust 控制，但實際排版交給 Chromium，以使用成熟的日文直書、
-> ruby、縱中橫、傍點與分頁能力。
+> **一句話說明：** 一份 `.mdi` 文件的完整語義全部由 Rust 決定；各語言套件
+> 只是同一份 Rust 實作的薄接口。
 
-## Sources of truth
+## Authority
 
 MDI has three complementary sources of truth:
 
-1. [`SYNTAX.md`](./SYNTAX.md) is the human-readable normative specification.
-2. The Rust parser is the only executable reference implementation.
-3. Shared conformance fixtures prove that every binding observes the same
-   syntax tree and diagnostics.
+1. [`SYNTAX.md`](./SYNTAX.md) is the normative, human-readable language
+   specification.
+2. `mdi-core` is the only executable implementation of that specification.
+3. Shared conformance fixtures define observable trees, diagnostics, and
+   rendered output.
 
-A language binding must not recognize, validate, or repair MDI syntax on its
-own. In particular, JavaScript code must not contain a second implementation
-of rules such as ruby boundaries, valid `kern` amounts, or balanced bracket
-macros.
+No JavaScript, Python, Swift, CLI, editor, or renderer may independently
+recognize, repair, or validate MDI syntax. Rules such as ruby grouping, nested
+macro boundaries, escapes, and valid kerning values exist exactly once, in
+Rust.
 
-## Target pipeline
+## System shape
 
 ```text
                                .mdi source
                                     │
                                     ▼
                     ┌─────────────────────────────┐
-                    │ Rust parser                 │
+                    │ mdi-core                    │
                     │ CommonMark + GFM + MDI      │
                     │ front matter + diagnostics  │
                     └──────────────┬──────────────┘
                                    │
                          versioned MDI document IR
                                    │
-             ┌─────────────────────┼─────────────────────┐
-             │                     │                     │
-             ▼                     ▼                     ▼
-      Rust renderers        language bindings     compatibility adapters
-      HTML/TXT/EPUB/        JS/Python/Swift       mdast/remark when needed
-      DOCX/MDI              (no grammar rules)    (no grammar rules)
+             ┌─────────────────────┼──────────────────────┐
+             │                     │                      │
+             ▼                     ▼                      ▼
+      Rust renderers        language bindings      ecosystem adapters
+      MDI/TXT/HTML/          JS/Python/Swift        mdast/remark
+      EPUB/DOCX              (no grammar)           (no grammar)
              │
              └── HTML + print CSS ──▶ Chromium ──▶ PDF
 ```
 
-The parser consumes the whole document, not isolated MDI fragments. This is
-necessary to make the correct decision in all of these cases:
+`mdi-core` parses the entire document. MDI cannot be parsed safely as a pass
+over isolated text because its boundaries depend on Markdown context:
 
 ```markdown
-`^12^`                 <!-- code: literal -->
-**第^12^話**           <!-- MDI inside CommonMark strong -->
-[[em:**重要**]]        <!-- CommonMark inside an MDI construct -->
+`^12^`                 <!-- literal code -->
+**第^12^話**           <!-- MDI inside strong text -->
+[[em:**重要**]]        <!-- Markdown inside an MDI construct -->
 ```
 
-If CommonMark context were decided independently in every host language, Rust
-would not actually control MDI boundaries.
+CommonMark, GFM, front matter, and MDI therefore form one Rust-owned grammar
+and one syntax tree.
 
-## The document IR
+## `mdi-core` contract
 
-The Rust parser returns a versioned, language-neutral document IR. Its public
-contract includes:
-
-- the MDI syntax version and IR schema version;
-- CommonMark/GFM and MDI nodes in one tree;
-- source spans measured in UTF-8 bytes;
-- front matter, including unknown keys that must round-trip;
-- recoverable diagnostics rather than host-language exceptions for ordinary
-  malformed input;
-- enough source information for canonical serialization and editor tooling.
-
-Rust enums are an internal implementation detail. Bindings exchange the
-versioned wire representation and map it to idiomatic objects in their host
-language. This prevents Rust refactors from silently breaking every SDK.
-
-## Responsibility by layer
-
-| Responsibility | Owner |
-|---|---|
-| CommonMark, GFM, front matter, and MDI parsing | Rust |
-| MDI boundary decisions and validation | Rust |
-| Normalization and semantic tree repair | Rust |
-| Canonical `.mdi` serialization | Rust |
-| HTML and text-family output | Rust |
-| EPUB packaging | Rust |
-| DOCX generation | Rust, after the core formats are stable |
-| PDF orchestration | Rust |
-| Japanese PDF layout and painting | Chromium |
-| Filesystem, UI, and platform integration | Host language |
-| Mapping the IR to mdast or native classes | Host binding |
-
-Generating HTML is serialization, not graphics rendering, and therefore
-belongs in Rust. EPUB is XHTML, metadata, CSS, and ZIP packaging, so it also
-belongs in Rust. DOCX is OOXML in a ZIP container and can move to Rust, though
-it comes later because Microsoft Word compatibility requires more integration
-testing.
-
-Rust does not implement a new PDF layout engine. It renders HTML and print CSS,
-starts a compatible Chromium executable, invokes the DevTools `printToPDF`
-operation, and returns the resulting bytes. Browser WASM cannot start a local
-process, so browser clients call a server or desktop host for PDF generation.
-
-## Language bindings
-
-Every binding exposes the same conceptual API:
+The core exposes the same conceptual API through native Rust and every
+binding:
 
 ```text
-parse(source, options) -> document + diagnostics
-validate(document) -> diagnostics
-normalize(document) -> document
-serializeMdi(document) -> string
+parse(source, options) -> ParseResult
+validate(document, options) -> diagnostics
+normalize(document, options) -> document
+serializeMdi(document, options) -> string
 renderHtml(document, profile) -> string
 renderText(document, flavor, profile) -> string
 renderEpub(document, profile) -> bytes
@@ -125,62 +77,109 @@ renderDocx(document, profile) -> bytes
 renderPdf(document, profile) -> bytes
 ```
 
-Planned binding technologies are:
+Bindings use idiomatic names and types for their host language, but each call
+has the same inputs, outputs, diagnostics, and semantics. Render profiles
+configure presentation—page size, writing direction, fonts, margins, and
+output-specific metadata. They never enable, disable, or reinterpret grammar.
 
-| Host | Binding |
+`parse` accepts the complete UTF-8 source and never requires a host Markdown
+parser. Ordinary malformed input produces a usable tree plus diagnostics;
+exceptions are reserved for programming errors or unavailable system
+resources.
+
+### Document IR
+
+The public IR is language-neutral and explicitly versioned. It contains:
+
+- the MDI syntax version and IR schema version;
+- typed CommonMark, GFM, front-matter, and MDI nodes in one tree;
+- a half-open UTF-8 byte span on every source-backed node;
+- ordered front-matter data, including unknown keys;
+- document metadata and footnote relationships;
+- recoverable diagnostics with stable codes, severity, and source spans;
+- sufficient source information for canonical `.mdi` serialization and
+  editor features.
+
+The block model covers paragraphs, headings, block quotes, lists, code,
+thematic breaks, HTML, tables, footnote definitions, blank paragraphs, page
+breaks, and block alignment. The inline model covers text, emphasis, strong,
+deletion, links, images, code, HTML, footnote references, line breaks, ruby,
+tate-chu-yoko, boten, no-break, warichu, and kerning.
+
+Rust enums are private implementation details. FFI users exchange a stable
+wire representation and bindings map that representation to idiomatic host
+objects. An incompatible wire-schema change increments the IR version.
+
+### Parsing invariants
+
+- Code spans, fenced code, and raw contexts keep MDI-looking text literal.
+- CommonMark may be nested inside MDI containers where `SYNTAX.md` permits it.
+- MDI nodes may occur inside eligible CommonMark inline containers.
+- Invalid or unmatched MDI delimiters follow the literal-fallback rules in
+  `SYNTAX.md` and may also emit a diagnostic.
+- All offsets are UTF-8 byte offsets into the original input.
+- Parsing the same source and options produces the same IR and diagnostics on
+  every platform.
+
+## Rendering
+
+Deterministic transformations live in Rust:
+
+| Output | Implementation |
 |---|---|
+| Canonical MDI | Rust serializer |
+| TXT flavors | Rust renderer |
+| HTML | Rust HTML/CSS renderer |
+| EPUB | Rust XHTML, metadata, CSS, and ZIP packager |
+| DOCX | Rust OOXML and ZIP packager |
+| PDF | Rust HTML/print-CSS renderer and Chromium controller |
+
+Every renderer accepts the versioned Rust IR. A renderer never reparses source
+text, reconstructs MDI boundaries, or delegates document semantics to a host
+language. Equivalent input, options, fonts, and renderer versions produce
+equivalent output.
+
+PDF deliberately uses Chromium as its layout engine. Rust locates or accepts
+a Chromium executable, starts an isolated process, communicates through the
+Chrome DevTools Protocol, calls `printToPDF`, and returns PDF bytes. Chromium
+provides Japanese vertical layout, ruby, tate-chu-yoko, text emphasis, font
+shaping, and pagination; it does not parse MDI or decide document semantics.
+
+Browser WebAssembly cannot launch a process. In that environment parsing and
+deterministic renderers run locally, while PDF generation is provided by a
+server or desktop host running the same Rust PDF API.
+
+## Bindings and adapters
+
+| Host | Interface |
+|---|---|
+| Rust | Native crate API |
 | Browser JavaScript | WebAssembly |
-| Node.js | WebAssembly first; N-API may be added for native distribution |
+| Node.js | Native or WebAssembly binding with the same wire contract |
 | Python | PyO3 |
 | Swift | UniFFI or a small C ABI packaged as an XCFramework |
-| Rust | Native crates |
 
-The binding may convert strings, byte arrays, errors, and object shapes. It
-must not implement syntax rules.
+A binding may convert strings, bytes, errors, options, and object shapes. It
+may not contain grammar tables, tokenizers, syntax fallbacks, or renderer
+semantics.
 
-## What happens to remark?
+The wire boundary carries explicit syntax and IR versions. Bindings reject an
+unsupported IR version instead of guessing its meaning. Diagnostics retain
+their stable code, severity, message, and UTF-8 source span across every
+binding.
 
-Remark is a JavaScript ecosystem for parsing Markdown into mdast and running
-AST plugins. It is not part of the target parser core. The primary JavaScript
-API will call Rust directly.
+Remark is an optional ecosystem adapter. It maps the Rust document IR to and
+from mdast so unified plugins can participate in a workflow. It never parses
+MDI and never changes MDI boundary decisions. The primary JavaScript API calls
+Rust directly and does not require remark.
 
-If existing Astro, unified, or remark users need mdast, a compatibility adapter
-will map the Rust document IR to mdast. That adapter may participate in a
-remark pipeline, but it cannot tokenize MDI or make syntax decisions.
+## Compliance
 
-## Migration stages
+An implementation is part of MDI only if all of the following are true:
 
-The architecture changes immediately, while implementation moves in verified
-vertical slices:
-
-1. **Contract and JavaScript binding.** Define the versioned wire format,
-   expose the Rust parser through WASM, and provide a typed JavaScript API.
-   The initial parser result is explicitly transitional until full CommonMark
-   integration lands.
-2. **One Rust parser.** Integrate CommonMark/GFM/front matter and all MDI
-   constructs in the Rust tokenizer. Run the same fixtures against the old JS
-   pipeline and the new Rust pipeline, then remove the JS tokenizer.
-3. **Canonical transforms and serialization.** Move validation, normalization,
-   tree repair, and `.mdi` writing into Rust.
-4. **Deterministic renderers.** Move text-family output, HTML, and EPUB into
-   Rust. Keep compatibility adapters only where users need ecosystem ASTs.
-5. **Document and print formats.** Move DOCX generation, then replace the
-   Playwright wrapper with Rust-controlled Chromium for PDF.
-6. **Native bindings.** Add Python and Swift bindings over the same IR and
-   renderer APIs.
-
-The old JavaScript implementation remains only as a differential-test oracle
-until the Rust parser reaches conformance. It is not a second long-term
-implementation.
-
-## Current transition status
-
-At the start of stage 1, `mdi-core` already parses an MDI-only subset in Rust,
-but its full parser is not exposed through WASM. JavaScript micromark constructs
-still decide token boundaries, and the JavaScript converters still consume
-mdast. This is migration state, not the intended architecture.
-
-The first binding introduced in stage 1 exposes that Rust-owned MDI syntax
-tree with an explicit IR version. It establishes the cross-language contract;
-stage 2 replaces the transitional line-oriented document parser with the full
-CommonMark/GFM/MDI parser without moving syntax authority back into JavaScript.
+- every syntax entry point delegates the complete source to `mdi-core`;
+- all public parse results declare their syntax and IR versions;
+- every binding passes the shared parse and diagnostic fixtures unchanged;
+- every deterministic renderer consumes the Rust IR;
+- PDF uses HTML/CSS produced from the Rust IR and is orchestrated by Rust;
+- no host-language package contains an alternative MDI tokenizer or parser.

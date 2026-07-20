@@ -1,6 +1,7 @@
 # @illusions-lab/mdi-to-epub
 
-Serializes @illusions-lab/mdi-to-hast output to valid EPUB XHTML and packages it (container.xml, OPF manifest, nav, spine split on chapter/page breaks).
+JavaScript binding for the Rust EPUB renderer. Rust generates XHTML, CSS,
+metadata, navigation, spine, and ZIP packaging from the versioned document IR.
 
 Part of the [MDI](https://github.com/illusions-lab/MDI) monorepo. See the root README for the full package architecture.
 

@@ -1,9 +1,9 @@
 ---
 title: MDI
-description: illusion Markdown (MDI) のための Node.js ツール群 — .mdi ファイルを解析し、HTML・PDF・EPUB・DOCX へ変換します。
+description: Rust で動く illusion Markdown (MDI) ツール群 — 全プラットフォームで単一のパーサと一貫した出力を提供します。
 template: splash
 hero:
-  tagline: illusion Markdown (MDI) のための Node.js ツール群 — .mdi ファイルを解析し、HTML・PDF・EPUB・DOCX へ変換します。
+  tagline: illusion Markdown (MDI) を単一の Rust パーサで解析し、HTML・PDF・EPUB・DOCX・テキストへ一貫して出力します。
   actions:
     - text: はじめに
       link: /MDI/ja/guides/getting-started/
@@ -17,23 +17,22 @@ hero:
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
 <CardGrid stagger>
-	<Card title="ひとつのツリー、4 つの出力" icon="seti:html">
-		すべてのコンバータは `@illusions-lab/mdi-remark` が生成する同一の
-		mdast ツリーを消費するため、エディタ側とエクスポート側の挙動が
-		分岐しません。HTML・PDF・EPUB は mdast → hast 変換を共有し、DOCX
-		はネイティブ OOXML へ直接マッピングします。
+	<Card title="唯一の信頼できる実装" icon="seti:rust">
+		`mdi-core` が CommonMark、GFM、フロントマター、すべての MDI 構文を
+		バージョン付き文書 IR に解析します。全バインディングとレンダラーが
+		同じ構文判断を共有します。
 	</Card>
 	<Card title="本物の日本語組版" icon="translate">
 		ルビ・縦中横・傍点・割注・字間調整・縦書き — 後処理ハックではなく、
 		第一級の構文として解析されます。[ライブ・ショーケース](/MDI/ja/syntax/showcase/)
 		をご覧ください。このサイト自体が MDI のパーサで MDI を描画しています。
 	</Card>
-	<Card title="unified ベース" icon="puzzle">
-		micromark 構文拡張と mdast ユーティリティは、既存の remark/rehype
-		パイプラインにそのまま組み込めます — このページを生成した
-		パイプラインもその一つです。
+	<Card title="薄い言語インターフェース" icon="puzzle">
+		JavaScript、Python、Swift は別の tokenizer を持たず、同じ Rust API
+		を公開します。unified で mdast が必要な場合は remark adapter を使えます。
 	</Card>
 	<Card title="CLI 同梱" icon="seti:shell">
-		`mdi build novel.mdi --to pdf` — 原稿から成果物まで 1 コマンド。
+		`mdi build novel.mdi --to pdf` — 原稿を Rust 制御の Chromium PDF
+		パイプラインへ渡す 1 コマンドです。
 	</Card>
 </CardGrid>

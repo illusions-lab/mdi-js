@@ -1,6 +1,7 @@
 # @illusions-lab/mdi-to-html
 
-Renders @illusions-lab/mdi-to-hast output to an HTML string with the default MDI stylesheet (SYNTAX.md CSS class summary).
+JavaScript binding for the Rust HTML/CSS renderer. It accepts the versioned
+Rust document IR and returns the complete HTML output without reparsing MDI.
 
 Part of the [MDI](https://github.com/illusions-lab/MDI) monorepo. See the root README for the full package architecture.
 

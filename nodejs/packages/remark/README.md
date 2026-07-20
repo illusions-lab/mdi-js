@@ -1,7 +1,24 @@
-# @illusions-lab/mdi-remark
+# `@illusions-lab/mdi-remark`
 
-Bundled remark plugin: GFM + YAML front matter + MDI extensions. The recommended entry point for producing an MDI mdast tree.
+Unified/remark adapter for the Rust-authoritative MDI engine.
 
-Part of the [MDI](https://github.com/illusions-lab/MDI) monorepo. See the root README for the full package architecture.
+The adapter sends the complete source document to `mdi-core`, exposes the
+resulting versioned document IR as mdast to a unified pipeline, and converts a
+modified mdast tree back to Rust IR when the pipeline needs MDI serialization
+or another output format.
 
-Documentation: https://mdi.illusions.app/
+```text
+source → mdi-core → Rust IR ⇄ mdast → unified plugins
+```
+
+It does not extend remark's tokenizer and does not implement CommonMark, GFM,
+front matter, or MDI syntax. All parsing, boundary decisions, validation,
+normalization, serialization, and renderer semantics remain in Rust.
+
+Use [`@illusions-lab/mdi`](../mdi) directly when unified plugins are not
+required. This package exists only to connect the same Rust parse result to the
+remark ecosystem.
+
+Part of the [MDI](https://github.com/illusions-lab/MDI) monorepo. See the
+[architecture documentation](https://mdi.illusions.app/guides/architecture/)
+for ownership and wire-contract details.
