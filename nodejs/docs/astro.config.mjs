@@ -77,27 +77,49 @@ export default defineConfig({
 			plugins: apiPlugins,
 			sidebar: [
 				{
-					label: 'Guides',
-					translations: { ja: 'ガイド', 'zh-TW': '指南' },
+					label: 'Learn',
+					translations: { ja: '学ぶ', 'zh-TW': '學習' },
 					items: [
+						{ label: 'What is MDI?', translations: { ja: 'MDI とは？', 'zh-TW': '什麼是 MDI？' }, slug: 'learn/what-is-mdi' },
+						{ label: 'Core concepts', translations: { ja: 'コア概念', 'zh-TW': '核心概念' }, slug: 'learn/core-concepts' },
 						{
 							label: 'Getting Started',
 							translations: { ja: 'はじめに', 'zh-TW': '快速上手' },
 							slug: 'guides/getting-started',
 						},
-						{
-							label: 'Architecture',
-							translations: { ja: 'アーキテクチャ', 'zh-TW': '架構' },
-							slug: 'guides/architecture',
-						},
-						{
-							label: 'Export Profiles',
-							translations: {
-								ja: 'エクスポート・プロファイル',
-								'zh-TW': '匯出設定檔',
-							},
-							slug: 'guides/export-profiles',
-						},
+						{ label: 'Full syntax reference', translations: { ja: '完全構文リファレンス', 'zh-TW': '完整語法參考' }, slug: 'syntax/reference' },
+					],
+				},
+				{
+					label: 'Core',
+					translations: { ja: 'コア', 'zh-TW': '核心' },
+					items: [
+						{ label: 'Rust-authoritative architecture', translations: { ja: 'Rust 主導アーキテクチャ', 'zh-TW': 'Rust 權威架構' }, slug: 'core/architecture' },
+						{ label: 'Document IR', translations: { ja: 'ドキュメント IR', 'zh-TW': '文件 IR' }, slug: 'core/document-ir' },
+						{ label: 'Diagnostics and UTF-8 source spans', translations: { ja: '診断と UTF-8 ソーススパン', 'zh-TW': '診斷與 UTF-8 原始碼 span' }, slug: 'core/diagnostics' },
+						{ label: 'Rendering model and Chromium/PDF boundary', translations: { ja: 'レンダリングと Chromium/PDF 境界', 'zh-TW': '渲染模型與 Chromium/PDF 邊界' }, slug: 'core/rendering' },
+						{ label: 'Rust Core API status', translations: { ja: 'Rust Core API の状態', 'zh-TW': 'Rust Core API 狀態' }, slug: 'core/rust-api' },
+					],
+				},
+				{
+					label: 'Bindings',
+					translations: { ja: 'バインディング', 'zh-TW': 'Bindings' },
+					items: [
+						{ label: 'JavaScript / TypeScript', translations: { ja: 'JavaScript / TypeScript', 'zh-TW': 'JavaScript / TypeScript' }, slug: 'bindings/javascript' },
+						{ label: 'Rust', translations: { ja: 'Rust', 'zh-TW': 'Rust' }, slug: 'bindings/rust' },
+						{ label: 'Python', translations: { ja: 'Python', 'zh-TW': 'Python' }, slug: 'bindings/python' },
+						{ label: 'Swift', translations: { ja: 'Swift', 'zh-TW': 'Swift' }, slug: 'bindings/swift' },
+						{ label: 'CLI', translations: { ja: 'CLI', 'zh-TW': 'CLI' }, slug: 'bindings/cli' },
+					],
+				},
+				{
+					label: 'Ecosystem',
+					translations: { ja: 'エコシステム', 'zh-TW': '生態系' },
+					items: [
+						{ label: 'Remark / mdast adapter', translations: { ja: 'Remark / mdast アダプター', 'zh-TW': 'Remark / mdast adapter' }, slug: 'ecosystem/remark' },
+						{ label: 'Export profiles', translations: { ja: 'エクスポート・プロファイル', 'zh-TW': '匯出設定檔' }, slug: 'ecosystem/export-profiles' },
+						{ label: 'HTML / TXT / EPUB / DOCX / PDF outputs', translations: { ja: 'HTML / TXT / EPUB / DOCX / PDF 出力', 'zh-TW': 'HTML / TXT / EPUB / DOCX / PDF 輸出' }, slug: 'ecosystem/outputs' },
+						{ label: 'Migration and compatibility', translations: { ja: '移行と互換性', 'zh-TW': '遷移與相容性' }, slug: 'ecosystem/compatibility' },
 					],
 				},
 				{
