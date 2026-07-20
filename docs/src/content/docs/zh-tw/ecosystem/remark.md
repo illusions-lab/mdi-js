@@ -1,6 +1,6 @@
 ---
 title: Remark / mdast adapter
-description: @illusions-lab/mdi-remark：將 Rust-authoritative MDI parse result 接入 unified/remark。
+description: "@illusions-lab/mdi-remark：將 Rust-authoritative MDI parse result 接入 unified/remark。"
 ---
 
 **先備知識：**[Rust-authoritative architecture](/zh-tw/core/architecture/)、[Document IR](/zh-tw/core/document-ir/)。

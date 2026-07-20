@@ -8,6 +8,9 @@
     "node": ">=20"
   },
   "scripts": {
+    "dev": "pnpm --filter docs dev",
+    "docs:dev": "pnpm --filter docs dev",
+    "docs:build": "pnpm run build && pnpm --filter docs build",
     "build": "turbo run build",
     "test": "turbo run test",
     "test:coverage": "turbo run test -- --coverage --coverage.reporter=lcov",

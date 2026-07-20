@@ -1,5 +1,7 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
+import astroExpressiveCode from 'astro-expressive-code';
+import mdx from '@astrojs/mdx';
 import starlight from '@astrojs/starlight';
 import { createStarlightTypeDocPlugin } from 'starlight-typedoc';
 import remarkMdi from '@illusions-lab/mdi-remark';
@@ -28,8 +30,8 @@ for (const dir of packages) {
 	const [plugin, sidebarGroup] = createStarlightTypeDocPlugin();
 	apiPlugins.push(
 		plugin({
-			entryPoints: [`../packages/${dir}/src/index.ts`],
-			tsconfig: `../packages/${dir}/tsconfig.json`,
+			entryPoints: [`../nodejs/packages/${dir}/src/index.ts`],
+			tsconfig: `../nodejs/packages/${dir}/tsconfig.json`,
 			output: `api/${dir}`,
 			sidebar: { label: dir },
 			// Package READMEs are one-line npm stubs; the docs site itself
@@ -48,6 +50,10 @@ export default defineConfig({
 		remarkRehype: { handlers: mdiHandlers },
 	},
 	integrations: [
+		astroExpressiveCode(),
+		// `remarkMdi` owns the Markdown parser for .md files. MDX needs its
+		// standard parser so imports and JSX components remain executable.
+		mdx({ extendMarkdownConfig: false }),
 		starlight({
 			title: 'MDI',
 			favicon: '/illusions-kanji.svg',
