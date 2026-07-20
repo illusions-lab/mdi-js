@@ -57,13 +57,13 @@ unsupported version.
 ## Rendering
 
 Rendering starts from the same Rust IR. Canonical MDI, plain text, HTML, EPUB,
-and DOCX renderers execute in Rust and are exposed through this package.
-PDF rendering is also orchestrated by Rust: `mdi-core` produces HTML and print
-CSS, controls an isolated Chromium process over CDP, and returns the resulting
-PDF bytes. JavaScript does not parse the document again before rendering.
+and DOCX renderers execute in Rust and are exposed through this package. PDF
+uses Rust HTML as its input to a host layout adapter such as
+`@illusions-lab/mdi-to-pdf`; the adapter may control Chromium, but it never
+parses MDI or produces semantic HTML.
 
-Browser WebAssembly cannot start Chromium. Browser code sends the document or
-IR to a server or desktop host when it needs PDF output.
+Browser WebAssembly cannot start Chromium. Browser code sends Rust-rendered
+HTML to a server or desktop host when it needs PDF output.
 
 ## Remark compatibility
 

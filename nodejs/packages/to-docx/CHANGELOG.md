@@ -1,5 +1,11 @@
 # @illusions-lab/mdi-to-docx
 
+## 2.0.5
+
+### Patch Changes
+
+- mdast-util-mdi@2.0.4
+
 ## 2.0.4
 
 ### Patch Changes

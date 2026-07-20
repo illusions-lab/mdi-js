@@ -9,4 +9,4 @@ description: 現在実装されている mdi build コマンド。
 mdi build <input.mdi> --to html|pdf|epub|docx|txt|txt-ruby|narou|kakuyomu|aozora|txt-all [--config export.json] [-o <output>]
 ```
 
-現在の CLI は remark/micromark と既存の Node 出力 package を使います。Rust を薄く呼び出す将来の境界は Planned であり、CLI は独自の構文権威ではありません。個別の `help` / `version` command は現在の source にありません。
+HTML、EPUB、DOCX とすべてのテキスト形式は Rust core が直接出力します。PDF は Rust が生成した HTML を Chromium に渡して最終レイアウトするだけで、Chromium は MDI を解析しません。profile は現在 PDF とテキスト出力に適用され、EPUB/DOCX の完全な profile parity は Rust API に追加中です。CLI は独自の構文権威ではありません。個別の `help` / `version` command は現在の source にありません。

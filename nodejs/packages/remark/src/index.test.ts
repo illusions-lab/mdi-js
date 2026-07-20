@@ -109,21 +109,13 @@ title: Example
 		expect(types).toContain("mdiEm");
 	});
 
-	it("does not yet parse ruby's escaped-pipe separator inside a GFM table cell", () => {
-		// SYNTAX.md §2 documents `{東京\|とうきょう}` in a table cell as producing
-		// normal ruby ("table parsing... unescapes \| before MDI inline
-		// parsing"), but mdast-util-gfm-table's `\|` unescaping is a post-hoc
-		// string replace on the already-built text node's value, not something
-		// that happens before micromark tokenizes the cell - so ruby's own
-		// tokenizer (which does its own raw character scan) never sees a bare
-		// `|` to recognize as its separator. This is a real, currently
-		// unresolved gap between the spec and how the underlying GFM table
-		// packages work, not an intentional design choice.
+	it("parses ruby's escaped-pipe separator inside a GFM table cell", () => {
+		// Rust owns the block and inline stages together, so it follows
+		// SYNTAX.md §2 rather than inheriting micromark's former ordering gap.
 		const tree = parse("| Word |\n| --- |\n| {東京\\|とうきょう} |");
 		const types = nodeTypes(tree);
 
-		expect(types).not.toContain("mdiRuby");
-		expect(types).toContain("text");
+		expect(types).toContain("mdiRuby");
 	});
 
 	it("round-trips through the full remark processor", () => {

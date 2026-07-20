@@ -1,5 +1,11 @@
 # @illusions-lab/mdi-to-html
 
+## 2.0.6
+
+### Patch Changes
+
+- @illusions-lab/mdi-to-hast@2.0.6
+
 ## 2.0.5
 
 ### Patch Changes

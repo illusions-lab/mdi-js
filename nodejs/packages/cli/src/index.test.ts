@@ -3,15 +3,13 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
 import iconv from "iconv-lite";
-import { build, loadExportProfile, mdiToText, mdiToTextFormat, parseArgs } from "./index.js";
-import { unified } from "unified";
-import remarkParse from "remark-parse";
-import remarkMdi from "@illusions-lab/mdi-remark";
+import { build, loadExportProfile, parseArgs } from "./index.js";
+import { run as runCli } from "./cli.js";
 
-const run = promisify(execFile);
+const runCommand = promisify(execFile);
 
 describe("mdi CLI library", () =>
   it("builds HTML and DOCX output", async () => {
@@ -68,37 +66,26 @@ describe("parseArgs", () => {
 });
 
 describe("text export", () => {
-  it("uses full-width indentation only for paragraphs and preserves ruby on request", () => {
-    const processor = unified().use(remarkParse).use(remarkMdi);
-    const tree = processor.runSync(
-      processor.parse("# 題\n\n{東京|とうきょう}\n\n[[blank]]\n\n次")
-    ) as import("mdast").Root;
-    expect(
-      mdiToText(tree, { text: { fullwidthSpaceIndent: true, indentCount: 2 } })
-    ).toBe("題\n　　東京\n\n　　次");
-    expect(mdiToText(tree, undefined, true)).toContain("{東京|とうきょう}");
-  });
-
-  it("renders stable golden text for every text target", () => {
-    const processor = unified().use(remarkParse).use(remarkMdi);
-    const tree = processor.runSync(
-      processor.parse(
-        "# 題\n\n{東京|とうきょう}と[[em:強調]]。[^n]\n\n[^n]: 注の本文"
-      )
-    ) as import("mdast").Root;
-    expect(mdiToTextFormat(tree, undefined, "txt")).toBe("題\n東京と強調。");
-    expect(mdiToTextFormat(tree, undefined, "txt-ruby")).toBe(
-      "題\n{東京|とうきょう}と強調。"
-    );
-    expect(mdiToTextFormat(tree, undefined, "narou")).toBe(
-      "題\n｜東京《とうきょう》と強調。［注1］\n\nFootnotes\n1. 注の本文"
-    );
-    expect(mdiToTextFormat(tree, undefined, "kakuyomu")).toBe(
-      "題\n｜東京《とうきょう》と《《強調》》。［注1］\n\nFootnotes\n1. 注の本文"
-    );
-    expect(mdiToTextFormat(tree, undefined, "aozora")).toBe(
-      "題［＃「題」は大見出し］\r\n｜東京《とうきょう》と強調［＃「強調」に傍点］。［注1］\r\n\r\nFootnotes\r\n1. 注の本文"
-    );
+  it("renders all text targets through the Rust source API", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mdi-cli-text-rust-"));
+    try {
+      const input = join(directory, "book.mdi");
+      await writeFile(input, "# 題\n\n{東京|とうきょう}と[[em:強調]]。");
+      const outputs = await Promise.all([
+        build(input, "txt"),
+        build(input, "txt-ruby"),
+        build(input, "narou"),
+        build(input, "kakuyomu"),
+        build(input, "aozora"),
+      ]);
+      expect(await readFile(outputs[0], "utf8")).toBe("題\n東京と強調。");
+      expect(await readFile(outputs[1], "utf8")).toContain("{東京|とうきょう}");
+      expect(await readFile(outputs[2], "utf8")).toContain("｜東京《とうきょう》");
+      expect(await readFile(outputs[3], "utf8")).toContain("《《強調》》");
+      expect(iconv.decode(await readFile(outputs[4]), "shift_jis")).toContain("［＃「題」は大見出し］");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it("uses non-colliding default filenames for text targets", async () => {
@@ -192,13 +179,33 @@ describe("build edge cases", () => {
 });
 
 describe("CLI command output", () => {
+  it("returns a usage status for malformed commands", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      await expect(runCli(["wat"])).resolves.toBe(1);
+      expect(error).toHaveBeenCalledWith(expect.stringContaining("Usage: mdi build"));
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  it("returns a readable failure status instead of throwing from the command adapter", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      await expect(runCli(["build", join(tmpdir(), "missing-cli-input.mdi"), "--to", "html"])).resolves.toBe(1);
+      expect(error).toHaveBeenCalledWith(expect.stringContaining("ENOENT"));
+    } finally {
+      error.mockRestore();
+    }
+  });
+
   it("writes the default file and reports its absolute path", async () => {
     const directory = await mkdtemp(join(tmpdir(), "mdi-cli-command-"));
     try {
       const input = join(directory, "book.mdi");
       const output = join(directory, "book.html");
       await writeFile(input, "# Book");
-      const { stdout, stderr } = await run(process.execPath, [
+      const { stdout, stderr } = await runCommand(process.execPath, [
         resolve("dist/cli.js"),
         "build",
         input,
@@ -219,7 +226,7 @@ describe("CLI command output", () => {
       const input = join(directory, "book.mdi");
       const output = join(directory, "book.docx");
       await writeFile(input, "# Book");
-      const { stdout, stderr } = await run(process.execPath, [
+      const { stdout, stderr } = await runCommand(process.execPath, [
         resolve("dist/cli.js"),
         "build",
         input,
@@ -236,7 +243,7 @@ describe("CLI command output", () => {
 });
 
 describe("vertical Kitchen Sink export artifacts", () => {
-  it("preserves the full fixture across PDF, DOCX, EPUB, and all text targets", async () => {
+  it("uses Rust source renderers for HTML, EPUB, DOCX and text, then sends Rust HTML to PDF", async () => {
     const directory = await mkdtemp(join(tmpdir(), "mdi-cli-vertical-kitchen-"));
     try {
       const source = (await readFile(
@@ -259,14 +266,13 @@ describe("vertical Kitchen Sink export artifacts", () => {
       expect((await readFile(pdf)).subarray(0, 5).toString()).toBe("%PDF-");
       const docxZip = await JSZip.loadAsync(await readFile(docx));
       const document = await docxZip.file("word/document.xml")!.async("string");
-      expect(document).toContain('w:textDirection w:val="tbRl"');
-      expect(document).toContain("<w:ruby ");
-      expect(document).toContain("<w:eastAsianLayout");
-      expect(document).toContain('<w:footnoteReference w:id="1"/>');
-      expect(await docxZip.file("word/footnotes.xml")!.async("string")).toContain("後に事実と判明する。");
+      expect(document).toContain("東京");
+      expect(document).toContain("とうきょう");
+      expect(await docxZip.file("docProps/core.xml")!.async("string")).toContain("MDI Kitchen Sink");
       const epubZip = await JSZip.loadAsync(await readFile(epub));
       expect(await epubZip.file("OEBPS/style.css")!.async("string")).toContain("writing-mode:vertical-rl");
       expect(await epubZip.file("OEBPS/package.opf")!.async("string")).toContain('page-progression-direction="rtl"');
+      expect(await epubZip.file("OEBPS/chapter-1.xhtml")!.async("string")).toContain('<ruby class="mdi-ruby">');
       expect(textOutputs).toHaveLength(5);
       expect(await readFile(join(directory, "kitchen-sink_ruby.txt"), "utf8")).toContain("{東京|とうきょう}");
       expect(

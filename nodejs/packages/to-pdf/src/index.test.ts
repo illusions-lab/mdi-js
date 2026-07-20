@@ -4,7 +4,7 @@ import remarkParse from "remark-parse";
 import remarkMdi from "@illusions-lab/mdi-remark";
 import { resolveExportProfile } from "@illusions-lab/mdi-export-profile";
 import type { Root } from "mdast";
-import { applyPdfProfile, mdiToPdf } from "./index.js";
+import { applyPdfProfile, mdiToPdf, renderHtmlToPdf } from "./index.js";
 
 describe("mdiToPdf", () =>
   it("generates a browser-rendered PDF", async () => {
@@ -31,6 +31,17 @@ describe("mdiToPdf edge cases", () => {
     }
   }, 30_000);
 });
+
+describe("renderHtmlToPdf", () =>
+  it("acts as a Chromium-only layout adapter for Rust-owned HTML", async () => {
+    const pdf = await renderHtmlToPdf(
+      "<html><head></head><body><h1>Rust HTML</h1><p>東京</p></body></html>",
+      undefined,
+      "vertical"
+    );
+    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(500);
+  }, 30_000));
 
 describe("PDF export profile", () => {
   it("uses a readable A4 portrait baseline for horizontal documents", () => {

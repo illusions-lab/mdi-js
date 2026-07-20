@@ -43,20 +43,15 @@ mdi build novel.mdi --to epub --config novel.export.json
 mdi build novel.mdi --to txt-ruby --config novel.export.json
 ```
 
-The CLI resolves a relative `coverPath` against the profile file and accepts JPEG and PNG covers only. Invalid dimensions, ranges, page-number values, and chapter split levels fail clearly instead of producing a different layout.
-
-Without a profile, PDF and DOCX use a conventional A4 portrait, horizontal layout: 25.4 mm (one-inch, matching Word's Normal preset) margins, 40 characters per line, and 34 lines per page. Front matter `writing-mode: vertical` selects vertical composition; it uses landscape A4 by default to keep the character grid readable. An explicit profile overrides either default.
+The schema is shared with applications and validates all its fields. In the current Rust-first CLI, the profile is applied to PDF and text output. EPUB and DOCX intentionally use the deterministic Rust baseline plus front matter metadata; cover media, chapter splitting, and full pagination/profile parity are pending Rust API options.
 
 ## Format support
 
-| Setting                              | PDF               | DOCX              | EPUB                                         | TXT / TXT ruby  |
-| ------------------------------------ | ----------------- | ----------------- | -------------------------------------------- | --------------- |
-| Paper size, orientation, margins     | Yes               | Yes               | Reflowable EPUB has no paper geometry        | —               |
-| Writing direction, font, em indent   | Yes               | Yes               | Yes                                          | —               |
-| Characters per line / lines per page | Yes               | Yes               | Reflowable EPUB cannot guarantee fixed pages | —               |
-| Full-width-space indent              | Yes               | Yes               | CSS `em` indent only                         | Yes, 1–4 spaces |
-| Page number format and position      | Yes               | Yes               | Reflowable EPUB has no stable page number    | —               |
-| Title, author, publisher, identifier | Document metadata | Document metadata | OPF metadata                                 | —               |
-| Cover and heading chapter split      | —                 | —                 | Yes                                          | —               |
+| Setting                              | PDF | EPUB / DOCX Rust baseline | TXT / TXT ruby |
+| ------------------------------------ | --- | ------------------------- | -------------- |
+| Print geometry, fonts, page numbers  | Yes | Pending Rust options      | —              |
+| Front matter metadata / writing mode | Yes | Yes                       | —              |
+| Full-width-space indent              | Yes | Pending Rust options      | Yes, 1–4 spaces |
+| Cover and heading chapter split      | —   | Pending Rust options      | —              |
 
 `pageSize` supports the complete Illusions page-size collection: ISO A, JIS B, ISO B, Japanese literary/book/envelope sizes, North American office sizes, and postcard/photo sizes. Use the exported `PAGE_SIZES` list when building a UI.
