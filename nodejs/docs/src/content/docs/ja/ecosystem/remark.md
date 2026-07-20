@@ -1,6 +1,6 @@
 ---
 title: Remark / mdast adapter
-description: @illusions-lab/mdi-remark が Rust の Document IR を mdast に渡す方法。
+description: "@illusions-lab/mdi-remark が Rust の Document IR を mdast に渡す方法。"
 ---
 
 **前提:** [JavaScript binding](/ja/bindings/javascript/)。`@illusions-lab/mdi-remark` は unified user 向けの adapter で、独自 parser ではありません。`Parser` を `@illusions-lab/mdi` の real Rust `parse()` と IR→mdast 変換で置き換えます。

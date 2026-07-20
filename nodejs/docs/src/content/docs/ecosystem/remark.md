@@ -1,6 +1,6 @@
 ---
 title: Remark / mdast adapter
-description: How @illusions-lab/mdi-remark maps Rust's IR into mdast — and exactly what it doesn't do.
+description: "How @illusions-lab/mdi-remark maps Rust's IR into mdast — and exactly what it doesn't do."
 ---
 
 **Prerequisites:** [Document IR](/core/document-ir/), [Rust-authoritative architecture](/core/architecture/).

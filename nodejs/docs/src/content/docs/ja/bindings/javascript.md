@@ -1,6 +1,6 @@
 ---
 title: JavaScript / TypeScript
-description: Rust-backed JavaScript API @illusions-lab/mdi。
+description: "Rust-backed JavaScript API @illusions-lab/mdi。"
 ---
 
 **前提:** [Getting Started](/ja/guides/getting-started/)、[Document IR](/ja/core/document-ir/)。
