@@ -180,6 +180,4 @@ Every package's version is `<MDI spec version>.<package release number>` — the
 
 ## License
 
-The Node.js tooling (`nodejs/`) and the Rust core (`mdi-core/`) are MIT — see [LICENSE](./LICENSE).
-
-The MDI specification ([`SYNTAX.md`](./SYNTAX.md)) is public domain — see [LICENSE-SPEC](./LICENSE-SPEC).
+All project code and the MDI specification ([`SYNTAX.md`](./SYNTAX.md)) are licensed under MIT — see [LICENSE](./LICENSE) and [LICENSE-SPEC](./LICENSE-SPEC).
