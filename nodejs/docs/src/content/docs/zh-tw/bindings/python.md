@@ -1,8 +1,21 @@
 ---
 title: Python
-description: Python binding 的狀態與預期契約。
+description: illusion Markdown 的 PyO3 Python binding。
 ---
 
-**Planned。** repository 的 `python/README.md` 明確寫著尚未實作。目前沒有可安裝的 package 或公開 API，因此本網站不建立虛假的 API reference。
+從 PyPI 安裝 PyO3 binding：
 
-預期 binding 會透過 PyO3 等方式呼叫 `mdi-core`，保留相同的 IR、診斷、UTF-8 byte span 與例外契約；Python 不會自行實作 tokenizer。
+```bash
+pip install illusion-markdown
+```
+
+發布名稱是 `illusion-markdown`，import namespace 是 `mdi`。
+
+```python
+import mdi
+
+result = mdi.parse("{東京|とうきょう} ^12^")
+html = mdi.render_html("# 題\n\n{東京|とうきょう}")
+```
+
+`parse()` 會回傳 Rust 擁有、具版本的 IR 與可恢復 diagnostics 的 JSON-compatible Python dictionary；source span 是 UTF-8 byte offset。`serialize_mdi`、`render_text`、`render_text_format`、`render_epub` 與 `render_docx` 也全都直接委派給 `mdi-core`。Python 不含 MDI tokenizer 或 renderer。

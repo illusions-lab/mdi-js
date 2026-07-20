@@ -1,14 +1,36 @@
 [project]
-name = "mdi"
-version = "0.0.0"
-description = "Python implementation of illusion Markdown (MDI). Not yet implemented."
+name = "illusion-markdown"
+version = "2.0.1"
+description = "Python bindings for illusion Markdown (MDI), backed by the Rust core."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
+authors = [{ name = "illusions-lab" }]
+keywords = ["markdown", "mdi", "ruby", "typesetting"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Rust",
+  "Topic :: Text Processing :: Markup",
+]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/mdi"]
+[project.urls]
+Homepage = "https://github.com/illusions-lab/MDI"
+Documentation = "https://illusions-lab.github.io/mdi-js/"
+Repository = "https://github.com/illusions-lab/MDI"
+Issues = "https://github.com/illusions-lab/MDI/issues"
+
+[tool.maturin]
+manifest-path = "Cargo.toml"
+module-name = "mdi._native"
+python-source = "src"
