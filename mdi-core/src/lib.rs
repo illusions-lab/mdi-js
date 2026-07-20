@@ -3989,32 +3989,80 @@ mod tests {
         assert!(docx_success);
     }
 
-    #[test]
     #[allow(unsafe_code)]
-    fn c_abi_returns_owned_versioned_wire_data() {
-        let source = "{東京|とうきょう} ^12^";
-        let result = ffi::mdi_parse_json(source.as_ptr(), source.len());
-        assert_eq!(result.error.len, 0);
-        let json = unsafe {
-            std::str::from_utf8(std::slice::from_raw_parts(
-                result.value.data,
-                result.value.len,
-            ))
-            .unwrap()
+    fn ffi_bytes(result: ffi::MdiFfiResult) -> Result<Vec<u8>, String> {
+        let value = if result.value.len == 0 {
+            Vec::new()
+        } else {
+            unsafe { std::slice::from_raw_parts(result.value.data, result.value.len).to_vec() }
         };
-        assert!(json.contains("\"irVersion\":\"1.0\""));
-        assert!(json.contains("\"type\":\"ruby\""));
+        let error = if result.error.len == 0 {
+            None
+        } else {
+            Some(unsafe {
+                std::str::from_utf8(std::slice::from_raw_parts(
+                    result.error.data,
+                    result.error.len,
+                ))
+                .unwrap()
+                .to_owned()
+            })
+        };
         unsafe {
             ffi::mdi_free_buffer(result.value);
             ffi::mdi_free_buffer(result.error);
         }
+        error.map_or(Ok(value), Err)
+    }
 
-        let invalid = ffi::mdi_parse_json(std::ptr::null(), 1);
-        assert_eq!(invalid.value.len, 0);
-        assert!(invalid.error.len > 0);
-        unsafe {
-            ffi::mdi_free_buffer(invalid.value);
-            ffi::mdi_free_buffer(invalid.error);
-        }
+    #[test]
+    #[allow(unsafe_code)]
+    fn c_abi_returns_owned_versioned_wire_data_for_every_export() {
+        let source = "{東京|とうきょう} ^12^";
+        let json = String::from_utf8(
+            ffi_bytes(ffi::mdi_parse_json(source.as_ptr(), source.len())).unwrap(),
+        )
+        .unwrap();
+        assert!(json.contains("\"irVersion\":\"1.0\""));
+        assert!(json.contains("\"type\":\"ruby\""));
+
+        let html = String::from_utf8(
+            ffi_bytes(ffi::mdi_render_html(source.as_ptr(), source.len())).unwrap(),
+        )
+        .unwrap();
+        assert!(html.contains("<ruby class=\"mdi-ruby\">東京"));
+        assert_eq!(
+            String::from_utf8(
+                ffi_bytes(ffi::mdi_serialize_mdi(source.as_ptr(), source.len())).unwrap()
+            )
+            .unwrap(),
+            "{東京|とうきょう} ^12^\n"
+        );
+        assert_eq!(
+            String::from_utf8(
+                ffi_bytes(ffi::mdi_render_text(source.as_ptr(), source.len())).unwrap()
+            )
+            .unwrap(),
+            "東京 12\n"
+        );
+        assert!(
+            ffi_bytes(ffi::mdi_render_epub(source.as_ptr(), source.len()))
+                .unwrap()
+                .starts_with(b"PK")
+        );
+        assert!(
+            ffi_bytes(ffi::mdi_render_docx(source.as_ptr(), source.len()))
+                .unwrap()
+                .starts_with(b"PK")
+        );
+
+        assert_eq!(
+            ffi_bytes(ffi::mdi_parse_json(std::ptr::null(), 1)).unwrap_err(),
+            "MDI source pointer is null"
+        );
+        assert_eq!(
+            ffi_bytes(ffi::mdi_render_epub(std::ptr::null(), 1)).unwrap_err(),
+            "MDI source pointer is null"
+        );
     }
 }
