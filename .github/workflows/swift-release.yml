@@ -49,9 +49,12 @@ jobs:
       - name: Validate version
         env:
           VERSION: ${{ inputs.version }}
+          FORCE_RETAG: ${{ inputs.force_retag }}
         run: |
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          ! git rev-parse --verify --quiet "refs/tags/$VERSION"
+          if git rev-parse --verify --quiet "refs/tags/$VERSION"; then
+            [[ "$FORCE_RETAG" == "true" ]]
+          fi
 
       - name: Build the Apple XCFramework
         run: scripts/package-swift-xcframework.sh "$RUNNER_TEMP/mdi-swift"
