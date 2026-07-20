@@ -26,18 +26,24 @@ importers:
 
   docs:
     dependencies:
+      '@astrojs/mdx':
+        specifier: ^7.0.3
+        version: 7.0.3(@astrojs/markdown-satteri@0.3.4)(astro@7.1.1(@astrojs/markdown-remark@7.2.1)(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)(@types/node@25.9.5)(rollup@4.62.2)(yaml@2.9.0))
       '@astrojs/starlight':
         specifier: ^0.41.3
         version: 0.41.3(@astrojs/markdown-remark@7.2.1)(astro@7.1.1(@astrojs/markdown-remark@7.2.1)(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)(@types/node@25.9.5)(rollup@4.62.2)(yaml@2.9.0))(typescript@5.9.3)
       '@illusions-lab/mdi-remark':
         specifier: workspace:*
-        version: link:../packages/remark
+        version: link:../nodejs/packages/remark
       '@illusions-lab/mdi-to-hast':
         specifier: workspace:*
-        version: link:../packages/to-hast
+        version: link:../nodejs/packages/to-hast
       astro:
         specifier: ^7.0.2
         version: 7.1.1(@astrojs/markdown-remark@7.2.1)(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)(@types/node@25.9.5)(rollup@4.62.2)(yaml@2.9.0)
+      astro-expressive-code:
+        specifier: ^0.44.0
+        version: 0.44.0(astro@7.1.1(@astrojs/markdown-remark@7.2.1)(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)(@types/node@25.9.5)(rollup@4.62.2)(yaml@2.9.0))
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -51,7 +57,7 @@ importers:
         specifier: ^4.6.0
         version: 4.12.0(typedoc@0.28.20(typescript@5.9.3))
 
-  packages/cli:
+  nodejs/packages/cli:
     dependencies:
       '@illusions-lab/mdi':
         specifier: workspace:*
@@ -82,7 +88,7 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@20.19.43)(lightningcss@1.32.0)
 
-  packages/export-profile:
+  nodejs/packages/export-profile:
     devDependencies:
       tsup:
         specifier: ^8.3.0
@@ -94,7 +100,7 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@25.9.5)(lightningcss@1.32.0)
 
-  packages/mdast-util-mdi:
+  nodejs/packages/mdast-util-mdi:
     dependencies:
       '@types/mdast':
         specifier: ^4.0.0
@@ -119,7 +125,7 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@25.9.5)(lightningcss@1.32.0)
 
-  packages/mdi:
+  nodejs/packages/mdi:
     dependencies:
       '@illusions-lab/mdi-core':
         specifier: workspace:*
@@ -135,9 +141,9 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@25.9.5)(lightningcss@1.32.0)
 
-  packages/mdi-core: {}
+  nodejs/packages/mdi-core: {}
 
-  packages/remark:
+  nodejs/packages/remark:
     dependencies:
       '@illusions-lab/mdi':
         specifier: workspace:*
@@ -177,7 +183,7 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@25.9.5)(lightningcss@1.32.0)
 
-  packages/to-docx:
+  nodejs/packages/to-docx:
     dependencies:
       '@illusions-lab/mdi-export-profile':
         specifier: workspace:*
@@ -217,7 +223,7 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@20.19.43)(lightningcss@1.32.0)
 
-  packages/to-epub:
+  nodejs/packages/to-epub:
     dependencies:
       '@illusions-lab/mdi-export-profile':
         specifier: workspace:*
@@ -260,7 +266,7 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@20.19.43)(lightningcss@1.32.0)
 
-  packages/to-hast:
+  nodejs/packages/to-hast:
     dependencies:
       '@illusions-lab/mdi-remark':
         specifier: workspace:*
@@ -297,7 +303,7 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@25.9.5)(lightningcss@1.32.0)
 
-  packages/to-html:
+  nodejs/packages/to-html:
     dependencies:
       '@illusions-lab/mdi-to-hast':
         specifier: workspace:*
@@ -328,7 +334,7 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@25.9.5)(lightningcss@1.32.0)
 
-  packages/to-pdf:
+  nodejs/packages/to-pdf:
     dependencies:
       '@illusions-lab/mdi-export-profile':
         specifier: workspace:*

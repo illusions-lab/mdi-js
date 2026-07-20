@@ -1,6 +1,6 @@
 ---
 title: Rust Core API 狀態
-description: `mdi-core/src/lib.rs` 現在實際公開的所有 symbol，包含 signature；不列猜測或願景項目。
+description: "`mdi-core/src/lib.rs` 現在實際公開的所有 symbol，包含 signature；不列猜測或願景項目。"
 ---
 
 **先備知識：**[Document IR](/zh-tw/core/document-ir/)。

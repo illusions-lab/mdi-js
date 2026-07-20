@@ -1,6 +1,6 @@
 ---
 title: JavaScript / TypeScript
-description: @illusions-lab/mdi：主要的 Rust-backed JavaScript API，及每個 export 的實際行為。
+description: "@illusions-lab/mdi：主要的 Rust-backed JavaScript API，及每個 export 的實際行為。"
 ---
 
 **先備知識：**[快速開始](/zh-tw/guides/getting-started/)、[Document IR](/zh-tw/core/document-ir/)。
