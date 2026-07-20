@@ -1,6 +1,6 @@
 ---
 title: CLI
-description: @illusions-lab/mdi-cli の install、format、flag、実際の挙動。
+description: "@illusions-lab/mdi-cli の install、format、flag、実際の挙動。"
 ---
 
 **前提:** [Getting Started](/ja/guides/getting-started/)。

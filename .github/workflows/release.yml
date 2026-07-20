@@ -15,9 +15,6 @@ jobs:
     permissions:
       contents: write
       id-token: write
-    defaults:
-      run:
-        working-directory: nodejs
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,7 +31,7 @@ jobs:
           # npm trusted publishing requires Node >= 22.14 and npm >= 11.5.1.
           node-version: 24
           cache: pnpm
-          cache-dependency-path: nodejs/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - run: pnpm install --frozen-lockfile
 
@@ -42,20 +39,20 @@ jobs:
 
       - name: Calculate next patch versions
         id: versions
-        run: node scripts/compute-release-versions.mjs
+        run: node nodejs/scripts/compute-release-versions.mjs
         env:
           # A manual recovery run with no base SHA safely releases no packages.
           RELEASE_BASE_SHA: ${{ github.event.before || github.sha }}
 
       - name: Publish next patch versions
         id: publish
-        run: node scripts/publish-versioned-packages.mjs
+        run: node nodejs/scripts/publish-versioned-packages.mjs
         env:
           RELEASE_PACKAGES: ${{ steps.versions.outputs.publishedPackages }}
 
       - name: Create GitHub Releases with downloadable tarballs
         if: steps.publish.outputs.published == 'true'
-        run: node scripts/create-github-releases.mjs
+        run: node nodejs/scripts/create-github-releases.mjs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUBLISHED_PACKAGES: ${{ steps.versions.outputs.publishedPackages }}
