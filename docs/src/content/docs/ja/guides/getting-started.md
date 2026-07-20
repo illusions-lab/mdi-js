@@ -21,10 +21,15 @@ mdi build novel.mdi --to html
 mdi build novel.mdi --to pdf
 mdi build novel.mdi --to epub -o dist/novel.epub
 mdi build novel.mdi --to docx
+mdi build novel.mdi --to txt
+mdi build novel.mdi --to txt-ruby
 ```
 
 `-o` を省略すると、入力ファイルと同じ場所にフォーマットの拡張子で
 出力されます（`novel.mdi` → `novel.pdf`）。
+
+`txt` は基本的なプレーンテキスト、`txt-ruby` はルビを `{base|reading}` の形で
+残す出力です。小説家になろう／青空文庫向けの専用形式は、まだ提供していません。
 
 :::note
 PDF 出力は [Playwright](https://playwright.dev) 経由のヘッドレス Chromium

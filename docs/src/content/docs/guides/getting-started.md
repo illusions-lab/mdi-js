@@ -1,6 +1,6 @@
 ---
 title: Getting Started
-description: Install mdi-js, parse a .mdi file, and convert it to HTML, PDF, EPUB, or DOCX.
+description: Install mdi-js, parse a .mdi file, and convert it to HTML, PDF, EPUB, DOCX, or plain text.
 ---
 
 mdi-js is a family of packages for **illusion Markdown (MDI)** — a Markdown
@@ -21,10 +21,15 @@ mdi build novel.mdi --to html
 mdi build novel.mdi --to pdf
 mdi build novel.mdi --to epub -o dist/novel.epub
 mdi build novel.mdi --to docx
+mdi build novel.mdi --to txt
+mdi build novel.mdi --to txt-ruby
 ```
 
 Without `-o`, the output file is written next to the input with the format's
 extension (`novel.mdi` → `novel.pdf`).
+
+`txt` writes basic plain text; `txt-ruby` keeps ruby as `{base|reading}`. They
+are not yet dedicated exporters for Narou or Aozora Bunko formats.
 
 :::note
 PDF output renders through a headless Chromium via
