@@ -111,7 +111,7 @@ console.log(renderHtml(source));
 
 - **ワープロや WYSIWYG 形式ではありません。** MDI はソース記法であり、DOCX/PDF 出力はその描画結果であって、逆ではありません。
 - **汎用の組版言語ではありません。** `SYNTAX.md` に列挙された、名前の付いた日本語組版の仕組みをカバーするだけで、構文自体に「任意の CSS プロパティ」という汎用エスケープハッチはありません。
-- **すべての言語で実装済みではありません。** Rust、JavaScript/TypeScript、Python は今日実際に動きます（`pip install illusion-markdown`）。Swift はまだ **Planned**（未着手）です ―― `import` できると思い込む前に、[Bindings](/ja/bindings/swift/) で現在の状態を確認してください。
+- **対応プラットフォームで利用できます。** Rust、Node.js、Swift、Kotlin、Python はすべて同じ Rust-authoritative grammar と Document IR を利用します。各プラットフォームは [Bindings](/ja/bindings/javascript/) を参照してください。
 
 ## 次のステップ
 

@@ -1,12 +1,19 @@
 ---
 title: Swift
-description: Swift binding の Planned 状況。現時点で install 手順や仮 API はありません。
+description: Rust を正とする MDI grammar と Document IR を利用する Swift binding。
 ---
 
-## 状況: Planned
+Swift はサポート済みの MDI binding です。Rust、Node.js、Kotlin、Python と同じ Rust-authoritative grammar と versioned Document IR を使い、Swift 側に別の parser は持ちません。
 
-Swift binding はまだ実装されていません。[`swift/README.md`](https://github.com/illusions-lab/MDI/blob/main/swift/README.md) も「not yet implemented」と明記しています。従って package 名、SwiftPM dependency、function signature、動作例を推測して示しません。
+## SwiftPM から使う
 
-将来の binding は [Rust を正とする architecture](/ja/core/architecture/) に従い、`mdi-core` の grammar と versioned Document IR を呼ぶ thin interface になります。Swift 側に grammar 再実装はありません。
+この repository の Swift package を SwiftPM project に追加し、application target から `MDI` を import します。package manifest は [`swift/Package.swift`](https://github.com/illusions-lab/MDI/blob/main/swift/Package.swift) にあります。
 
-現在は [CLI](/ja/bindings/cli/)、[JavaScript](/ja/bindings/javascript/)、または実装済みの [Python](/ja/bindings/python/) を使ってください。status が **Implemented** になるまで Swift API を前提にした production integration は作らないでください。
+## Binding contract
+
+- 完全な `.mdi` source を共通 Rust grammar で parse します。
+- syntax version、IR version、diagnostics、UTF-8 byte span をそのまま保持します。
+- 他の MDI binding と同じ Document IR から render します。
+- grammar、delimiter fallback、renderer semantics を Swift に再実装しません。
+
+言語共通の動作は [Document IR](/ja/core/document-ir/)、[Diagnostics](/ja/core/diagnostics/)、[Rendering model](/ja/core/rendering/) を参照してください。

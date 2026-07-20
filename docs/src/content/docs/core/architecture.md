@@ -35,14 +35,13 @@ This is stricter than "Rust is the reference implementation." A reference implem
              │                     │                      │
              ▼                     ▼                      ▼
       Rust renderers        language bindings      ecosystem adapters
-      HTML/TXT/EPUB/DOCX/MDI  JavaScript (real)      mdast/remark (real)
-                              Python (real)
-                              Swift (Planned)
+      HTML/TXT/EPUB/DOCX/MDI  Node.js (real)         mdast/remark (real)
+                              Python / Swift / Kotlin (real)
              │
              └── HTML + print CSS ──▶ Chromium ──▶ PDF
 ```
 
-Every arrow above is a real, checkable relationship today except the one marked Planned. `@illusions-lab/mdi` (JavaScript), `illusion-markdown` (Python, on PyPI), and `@illusions-lab/mdi-remark` all call the same Rust code — see [Bindings: JavaScript / TypeScript](/bindings/javascript/), [Bindings: Python](/bindings/python/), and [Ecosystem: Remark / mdast adapter](/ecosystem/remark/) for the exact call sites.
+Every arrow above is a real, checkable relationship today. Rust, Node.js, Swift, Kotlin, and Python all use the same Rust-authoritative grammar and document IR — see [Bindings](/bindings/javascript/) for each platform.
 
 ## Why one pass, not one pass per layer
 
@@ -71,7 +70,7 @@ An implementation is part of MDI only if all of the following hold:
 - PDF output uses HTML/CSS produced from the Rust IR, orchestrated by Rust.
 - No host-language package contains an alternative MDI tokenizer or parser.
 
-## Current implementation status vs. Planned
+## Current implementation status
 
 | Layer | Status |
 | --- | --- |
@@ -82,7 +81,8 @@ An implementation is part of MDI only if all of the following hold:
 | `@illusions-lab/mdi-remark` (mdast adapter) | **Implemented** as a one-way adapter (MDI → mdast); see [Ecosystem: Remark](/ecosystem/remark/) for exactly what "one-way" means today. |
 | `@illusions-lab/mdi-cli` | **Implemented**, calling Rust directly for every format except the final Chromium print step; see [Bindings: CLI](/bindings/cli/). |
 | Python binding (PyO3) | **Implemented.** Published on PyPI as [`illusion-markdown`](https://pypi.org/project/illusion-markdown/) (import name `mdi`); calls the same Rust core directly. See [Bindings: Python](/bindings/python/). |
-| Swift binding (UniFFI/C ABI) | **Planned.** [`swift/README.md`](https://github.com/illusions-lab/MDI/blob/main/swift/README.md) currently says "not yet implemented," in those words. See [Bindings: Swift](/bindings/swift/). |
+| Swift binding | **Implemented.** See [Bindings: Swift](/bindings/swift/). |
+| Android / Kotlin binding | **Implemented.** See [Bindings: Android / Kotlin](/bindings/android/). |
 
 The repository's [`ARCHITECTURE.md`](https://github.com/illusions-lab/MDI/blob/main/ARCHITECTURE.md) is the normative version of this contract; this page explains and status-checks it.
 
