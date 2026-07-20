@@ -63,6 +63,16 @@ describe("parseArgs", () => {
       format: "txt-ruby",
       config: "book.export.json",
     }));
+
+  it.each(["narou", "kakuyomu", "aozora", "txt-all"] as const)(
+    "accepts the %s text target",
+    (format) => {
+      expect(parseArgs(["book.mdi", "--to", format])).toEqual({
+        input: "book.mdi",
+        format,
+      });
+    }
+  );
 });
 
 describe("text export", () => {
@@ -179,6 +189,23 @@ describe("build edge cases", () => {
 });
 
 describe("CLI command output", () => {
+
+  it("returns success and reports every output written by the command adapter", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mdi-cli-run-success-"));
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      const input = join(directory, "book.mdi");
+      await writeFile(input, "text");
+      await expect(runCli(["build", input, "--to", "txt-all"])).resolves.toBe(0);
+      expect(log).toHaveBeenCalledTimes(5);
+      expect(log).toHaveBeenCalledWith(`Written ${join(directory, "book.txt")}`);
+      expect(log).toHaveBeenCalledWith(`Written ${join(directory, "book_aozora.txt")}`);
+    } finally {
+      log.mockRestore();
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("returns a usage status for malformed commands", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
