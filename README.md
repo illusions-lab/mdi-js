@@ -58,7 +58,7 @@ Building the WASM bridge also requires the `wasm32-unknown-unknown` Rust target 
 
 ## Releases
 
-Package versions use `<MDI spec version>.<package release number>`; for MDI 2.0, releases begin at `2.0.1`. Use a patch Changeset for ordinary releases. Merging to `main` makes GitHub Actions build and publish packages with its configured npm token.
+Package versions use `<MDI spec version>.<package release number>`; for MDI 2.0, releases begin at `2.0.1`. Use a patch Changeset for ordinary releases. Merging to `main` makes GitHub Actions build and publish packages through npm Trusted Publishing (OIDC).
 
 ```bash
 cd nodejs

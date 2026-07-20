@@ -58,7 +58,7 @@ WASM bridge のビルドには、`wasm32-unknown-unknown` Rust target と `wasm-
 
 ## リリース
 
-パッケージバージョンは `<MDI 仕様バージョン>.<パッケージのリリース番号>` です。MDI 2.0 では `2.0.1` から始まります。通常のリリースには patch Changeset を使います。`main` へのマージ後、GitHub Actions が設定済みの npm token を使ってパッケージをビルド・公開します。
+パッケージバージョンは `<MDI 仕様バージョン>.<パッケージのリリース番号>` です。MDI 2.0 では `2.0.1` から始まります。通常のリリースには patch Changeset を使います。`main` へのマージ後、GitHub Actions が npm Trusted Publishing（OIDC）でパッケージをビルド・公開します。
 
 ```bash
 cd nodejs
