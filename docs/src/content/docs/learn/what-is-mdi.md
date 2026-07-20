@@ -113,7 +113,7 @@ The [Getting Started](/guides/getting-started/) page walks through installing th
 
 - **Not a word processor or WYSIWYG format.** MDI is a source notation; DOCX/PDF output is a rendering of it, not the other way around.
 - **Not a general-purpose typesetting language.** It covers the specific, named Japanese typographic devices in `SYNTAX.md` — it does not have a generic "any CSS property" escape hatch in the syntax itself.
-- **Not implemented in every language yet.** Rust, JavaScript/TypeScript, and Python are real today (`pip install illusion-markdown`); Swift is still **Planned** — see [Bindings](/bindings/swift/) for its current status before assuming you can `import` it.
+- **Available across the supported platforms.** Rust, Node.js, Swift, Kotlin, and Python all use the same Rust-authoritative grammar and document IR. See [Bindings](/bindings/javascript/) for each platform.
 
 ## Next steps
 

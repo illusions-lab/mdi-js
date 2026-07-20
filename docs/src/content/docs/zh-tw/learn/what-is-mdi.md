@@ -111,7 +111,7 @@ console.log(renderHtml(source));
 
 - **不是文書處理軟體或 WYSIWYG 格式。** MDI 是一種原始碼記法；DOCX/PDF 輸出是它的渲染結果，而不是反過來。
 - **不是通用排版語言。** 它只涵蓋 `SYNTAX.md` 中列出的、具名的日本語組版手法 ―― 語法本身沒有「任意 CSS 屬性」這種通用逃生口。
-- **不是每種語言都已實作。** Rust、JavaScript/TypeScript、Python 今天就能真的使用（`pip install illusion-markdown`）。Swift 目前仍是 **Planned**（規劃中，尚未動工）―― 在假設可以 `import` 之前，請先查看 [Bindings](/zh-tw/bindings/swift/) 的目前狀態。
+- **所有支援的平台都可使用。** Rust、Node.js、Swift、Kotlin 與 Python 全都使用同一個 Rust-authoritative grammar 與 Document IR。請到 [Bindings](/zh-tw/bindings/javascript/) 查看各平台細節。
 
 ## 下一步
 

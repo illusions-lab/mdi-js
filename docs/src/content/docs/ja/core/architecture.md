@@ -20,13 +20,12 @@ description: 実行可能な文法は一つ、バージョン付き IR も一つ
 ```text
 .mdi source → mdi-core (Rust) → versioned Document IR
                               ├→ Rust: HTML / TXT / EPUB / DOCX / PDF
-                              ├→ JavaScript (実装済み) / Python (実装済み)
-                              ├→ Swift (Planned)
+                              ├→ Node.js / Python / Swift / Kotlin（実装済み）
                               └→ remark/mdast adapter (実装済み)
 HTML + print CSS → Chromium → PDF
 ```
 
-`@illusions-lab/mdi`、PyPI の `illusion-markdown`（import 名 `mdi`）、`@illusions-lab/mdi-remark` はいずれもこの同じ Rust core を呼びます。具体的な API は [JavaScript](/ja/bindings/javascript/)、[Python](/ja/bindings/python/)、[Remark](/ja/ecosystem/remark/) を参照してください。
+Rust、Node.js、Swift、Kotlin、Python はいずれもこの同じ Rust core を呼びます。具体的な API は [Bindings](/ja/bindings/javascript/) を参照してください。
 
 ## なぜ一回の解析なのか
 
@@ -40,7 +39,7 @@ MDI の境界は Markdown の文脈に依存します。
 
 二段階解析ではこの境界を再現して食い違う危険があります。binding は文字列・バイト列・エラー・オブジェクト形状を変換してよい一方、独自の文法や renderer 意味論を追加してはいけません。
 
-## 実装状況と Planned
+## 実装状況
 
 | 層 | 状態 |
 | --- | --- |
@@ -49,7 +48,8 @@ MDI の境界は Markdown の文脈に依存します。
 | Chromium を Rust が起動する PDF | **実装済み**。 [レンダリング](/ja/core/rendering/#the-chromiumpdf-boundary) |
 | JavaScript/WASM、CLI、remark adapter | **実装済み** |
 | Python PyO3 binding | **実装済み**。PyPI: `illusion-markdown` |
-| Swift UniFFI/C ABI binding | **Planned**。実装/API はありません。 |
+| Swift binding | **実装済み**。 [Swift](/ja/bindings/swift/) |
+| Android / Kotlin binding | **実装済み**。 [Android / Kotlin](/ja/bindings/android/) |
 
 ## 次へ
 
