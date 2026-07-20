@@ -1,8 +1,9 @@
 # @illusions-lab/mdi-to-docx
 
-JavaScript binding for the Rust DOCX renderer. Rust generates OOXML and ZIP
-packaging, including native `<w:ruby>`, `<w:eastAsianLayout>`, and
-section-level vertical writing, from the versioned document IR.
+Legacy mdast-to-DOCX compatibility adapter for unified ecosystem consumers.
+The Rust-first CLI uses `renderDocx()` from `@illusions-lab/mdi` directly.
+This package remains available for applications that need its existing
+profile-aware mdast integration surface.
 
 Part of the [MDI](https://github.com/illusions-lab/MDI) monorepo. See the root README for the full package architecture.
 
