@@ -34,7 +34,8 @@
     "mdast-util-mdi": "workspace:*",
     "remark-parse": "^11.0.0",
     "unified": "^11.0.0",
-    "@types/mdast": "^4.0.0"
+    "@types/mdast": "^4.0.0",
+    "iconv-lite": "^0.6.3"
   },
   "devDependencies": {
     "tsup": "^8.3.0",

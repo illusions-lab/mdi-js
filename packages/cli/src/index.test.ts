@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import JSZip from "jszip";
+import iconv from "iconv-lite";
 import { build, loadExportProfile, mdiToText, mdiToTextFormat, parseArgs } from "./index.js";
 import { unified } from "unified";
 import remarkParse from "remark-parse";
@@ -119,7 +120,7 @@ describe("text export", () => {
     const directory = await mkdtemp(join(tmpdir(), "mdi-cli-text-all-"));
     try {
       const input = join(directory, "kitchen-sink.mdi");
-      await writeFile(input, "{東京|とうきょう}");
+      await writeFile(input, "{東京|とうきょう}\n\n次");
       await expect(build(input, "txt-all")).resolves.toEqual([
         join(directory, "kitchen-sink.txt"),
         join(directory, "kitchen-sink_ruby.txt"),
@@ -127,7 +128,9 @@ describe("text export", () => {
         join(directory, "kitchen-sink_kakuyomu.txt"),
         join(directory, "kitchen-sink_aozora.txt"),
       ]);
-      expect(await readFile(join(directory, "kitchen-sink_aozora.txt"), "utf8")).toContain("｜東京《とうきょう》");
+      const aozora = await readFile(join(directory, "kitchen-sink_aozora.txt"));
+      expect(iconv.decode(aozora, "shift_jis")).toContain("｜東京《とうきょう》");
+      expect(aozora.includes(Buffer.from("\r\n"))).toBe(true);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -252,7 +255,9 @@ describe("vertical Kitchen Sink export artifacts", () => {
       expect(await epubZip.file("OEBPS/package.opf")!.async("string")).toContain('page-progression-direction="rtl"');
       expect(textOutputs).toHaveLength(5);
       expect(await readFile(join(directory, "kitchen-sink_ruby.txt"), "utf8")).toContain("{東京|とうきょう}");
-      expect(await readFile(join(directory, "kitchen-sink_aozora.txt"), "utf8")).toContain("｜東京《とうきょう》");
+      expect(
+        iconv.decode(await readFile(join(directory, "kitchen-sink_aozora.txt")), "shift_jis")
+      ).toContain("｜東京《とうきょう》");
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
