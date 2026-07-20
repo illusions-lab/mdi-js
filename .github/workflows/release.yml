@@ -35,7 +35,6 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: nodejs/pnpm-lock.yaml
-          registry-url: https://registry.npmjs.org
 
       - run: pnpm install --frozen-lockfile
 
