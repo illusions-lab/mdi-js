@@ -41,6 +41,19 @@ describe("mdi CLI library", () =>
     }
   }));
 
+describe("CLI publication defaults", () => {
+  it("rejects an unsupported library output target instead of writing an empty file", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mdi-cli-invalid-"));
+    try {
+      const input = join(directory, "book.mdi");
+      await writeFile(input, "text");
+      await expect(build(input, "invalid" as never)).rejects.toThrow("Unsupported output format: invalid");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("parseArgs", () => {
   it("requires an output format", () =>
     expect(parseArgs(["book.mdi"])).toBeUndefined());

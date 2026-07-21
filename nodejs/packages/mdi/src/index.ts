@@ -323,10 +323,34 @@ export async function renderDocxWithProfile(
 ): Promise<Uint8Array> {
 	assertSource(source);
 	assertPlainObject(profile, "profile");
+	prepareNodeDocxImport();
 	const { mdiToDocx } = await import("@illusions-lab/mdi-to-docx");
 	const normalized = normalizeDocxProfile(profile);
 	requireLayoutSystem(normalized);
 	return mdiToDocx(toPublicationMdast(parse(source).document), normalized);
+}
+
+/**
+ * `docx` probes `globalThis.localStorage` while loading its deprecation shim.
+ * Node 26 warns when that experimental getter is read without a persistence
+ * file.  Give only that Node-only import a harmless, non-persistent value;
+ * browser and Electron storage are left untouched.
+ */
+function prepareNodeDocxImport(): void {
+	const nodeProcess = (globalThis as typeof globalThis & {
+		process?: { release?: { name?: string }; execArgv?: string[] };
+	}).process;
+	if (
+		nodeProcess?.release?.name === "node" &&
+		!nodeProcess.execArgv?.some((argument) => argument.startsWith("--localstorage-file="))
+	) {
+		const descriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+		if (descriptor?.configurable && descriptor.get)
+			Object.defineProperty(globalThis, "localStorage", {
+				value: undefined,
+				configurable: true,
+			});
+	}
 }
 
 /**

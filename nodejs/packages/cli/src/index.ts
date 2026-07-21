@@ -95,7 +95,9 @@ export async function build(
         })
       : format === "docx"
       ? await renderDocxWithProfile(source, publicationProfile)
-      : "";
+      : (() => {
+          throw new Error(`Unsupported output format: ${format}`);
+        })();
   const extension = format;
   const destination =
     resolvedOptions.output ??
