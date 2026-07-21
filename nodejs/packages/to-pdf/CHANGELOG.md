@@ -1,5 +1,12 @@
 # @illusions-lab/mdi-to-pdf
 
+## Unreleased
+
+### Patch Changes
+
+- Add the browser-safe `@illusions-lab/mdi-to-pdf/profile` entry for applying
+  Chromium print profiles without importing Playwright or launching Chromium.
+
 ## 2.0.18
 
 ### Patch Changes

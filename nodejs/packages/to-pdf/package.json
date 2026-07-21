@@ -17,13 +17,17 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./profile": {
+      "types": "./dist/profile.d.ts",
+      "default": "./dist/profile.js"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts",
+    "build": "tsup --entry src/index.ts --entry src/profile.ts --format esm,cjs --dts",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
