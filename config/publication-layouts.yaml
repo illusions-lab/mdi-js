@@ -1,0 +1,110 @@
+# Language-neutral publication geometry.  Rust, Python, Swift, Android and
+# JavaScript consumers must treat this file as the shared catalogue; generated
+# or platform-native representations must be checked against it in CI.
+version: 1
+units: mm
+paperSizes:
+  A0: { widthMm: 841, heightMm: 1189 }
+  A1: { widthMm: 594, heightMm: 841 }
+  A2: { widthMm: 420, heightMm: 594 }
+  A3: { widthMm: 297, heightMm: 420 }
+  A4: { widthMm: 210, heightMm: 297 }
+  A5: { widthMm: 148, heightMm: 210 }
+  A6: { widthMm: 105, heightMm: 148 }
+  A7: { widthMm: 74, heightMm: 105 }
+  A8: { widthMm: 52, heightMm: 74 }
+  A9: { widthMm: 37, heightMm: 52 }
+  A10: { widthMm: 26, heightMm: 37 }
+  JIS-B0: { widthMm: 1030, heightMm: 1456 }
+  JIS-B1: { widthMm: 728, heightMm: 1030 }
+  JIS-B2: { widthMm: 515, heightMm: 728 }
+  JIS-B3: { widthMm: 364, heightMm: 515 }
+  JIS-B4: { widthMm: 257, heightMm: 364 }
+  JIS-B5: { widthMm: 182, heightMm: 257 }
+  JIS-B6: { widthMm: 128, heightMm: 182 }
+  JIS-B7: { widthMm: 91, heightMm: 128 }
+  JIS-B8: { widthMm: 64, heightMm: 91 }
+  JIS-B9: { widthMm: 45, heightMm: 64 }
+  JIS-B10: { widthMm: 32, heightMm: 45 }
+  ISO-B0: { widthMm: 1000, heightMm: 1414 }
+  ISO-B1: { widthMm: 707, heightMm: 1000 }
+  ISO-B2: { widthMm: 500, heightMm: 707 }
+  ISO-B3: { widthMm: 353, heightMm: 500 }
+  ISO-B4: { widthMm: 250, heightMm: 353 }
+  ISO-B5: { widthMm: 176, heightMm: 250 }
+  ISO-B6: { widthMm: 125, heightMm: 176 }
+  ISO-B7: { widthMm: 88, heightMm: 125 }
+  ISO-B8: { widthMm: 62, heightMm: 88 }
+  ISO-B9: { widthMm: 44, heightMm: 62 }
+  ISO-B10: { widthMm: 31, heightMm: 44 }
+  Bunko: { widthMm: 105, heightMm: 148 }
+  Shinsho: { widthMm: 103, heightMm: 182 }
+  Shirokuban: { widthMm: 127, heightMm: 188 }
+  Kikuban: { widthMm: 150, heightMm: 220 }
+  A5-ban: { widthMm: 148, heightMm: 210 }
+  B6-ban: { widthMm: 128, heightMm: 182 }
+  AB-ban: { widthMm: 210, heightMm: 257 }
+  Ju-ban: { widthMm: 182, heightMm: 206 }
+  Kiku-tate: { widthMm: 152, heightMm: 218 }
+  Tankobon: { widthMm: 130, heightMm: 188 }
+  Letter: { widthMm: 216, heightMm: 279 }
+  Legal: { widthMm: 216, heightMm: 356 }
+  Tabloid: { widthMm: 279, heightMm: 432 }
+  Executive: { widthMm: 184, heightMm: 267 }
+  Statement: { widthMm: 140, heightMm: 216 }
+  Folio: { widthMm: 210, heightMm: 330 }
+  Quarto: { widthMm: 203, heightMm: 254 }
+  10x14: { widthMm: 254, heightMm: 356 }
+  Naga-3: { widthMm: 120, heightMm: 235 }
+  Naga-4: { widthMm: 90, heightMm: 205 }
+  Kaku-2: { widthMm: 240, heightMm: 332 }
+  Kaku-3: { widthMm: 216, heightMm: 277 }
+  Kaku-6: { widthMm: 162, heightMm: 229 }
+  Kaku-8: { widthMm: 119, heightMm: 197 }
+  You-4: { widthMm: 105, heightMm: 235 }
+  You-6: { widthMm: 98, heightMm: 190 }
+  Hagaki: { widthMm: 100, heightMm: 148 }
+  Ofuku-Hagaki: { widthMm: 200, heightMm: 148 }
+  L-ban: { widthMm: 89, heightMm: 127 }
+  2L-ban: { widthMm: 127, heightMm: 178 }
+  KG: { widthMm: 102, heightMm: 152 }
+  Cabinet: { widthMm: 130, heightMm: 180 }
+  B5: { widthMm: 176, heightMm: 250 }
+  B6: { widthMm: 125, heightMm: 176 }
+
+# These are generic renderer defaults, not contest or publisher-house presets.
+layouts:
+  japanese-publisher:
+    horizontal:
+      pageSize: Shirokuban
+      landscape: false
+      fontFamily: "Yu Mincho, Hiragino Mincho ProN, Noto Serif JP, serif"
+      fontSizePt: 10
+      grid: { charactersPerLine: 27, linesPerPage: 26, mode: strict }
+      margins: { top: 16.5, bottom: 18, left: 18, right: 15.5 }
+      binding: { side: left, marginMode: mirror, gutterMm: 0 }
+    vertical:
+      pageSize: A4
+      landscape: true
+      fontFamily: "Yu Mincho, Hiragino Mincho ProN, Noto Serif JP, serif"
+      fontSizePt: 10.5
+      grid: { charactersPerLine: 40, linesPerPage: 30, mode: strict }
+      margins: { top: 30.91666666666667, bottom: 30.91666666666667, left: 28, right: 28 }
+      binding: { side: right, marginMode: mirror, gutterMm: 0 }
+  word:
+    horizontal:
+      pageSize: A4
+      landscape: false
+      fontFamily: "Yu Mincho, Hiragino Mincho ProN, Noto Serif JP, serif"
+      fontSizePt: 10.5
+      margins: { top: 25.4, bottom: 25.4, left: 25.4, right: 25.4 }
+      gridMode: typographic
+      binding: { side: left, marginMode: single, gutterMm: 0 }
+    vertical:
+      pageSize: A4
+      landscape: false
+      fontFamily: "Yu Mincho, Hiragino Mincho ProN, Noto Serif JP, serif"
+      fontSizePt: 10.5
+      margins: { top: 25.4, bottom: 25.4, left: 25.4, right: 25.4 }
+      gridMode: typographic
+      binding: { side: left, marginMode: single, gutterMm: 0 }

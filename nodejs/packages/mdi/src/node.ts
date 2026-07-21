@@ -6,7 +6,10 @@ import {
 	type MdiNode,
 	type MdiRenderResult,
 } from "./index.js";
-import type { ExportProfile } from "@illusions-lab/mdi-export-profile";
+import {
+	requireLayoutSystem,
+	type ExportProfile,
+} from "@illusions-lab/mdi-export-profile";
 
 /** A Chromium-capable adapter which turns complete HTML into a PDF. */
 export interface MdiPdfChromiumAdapter {
@@ -39,6 +42,7 @@ export function preparePdfExport(
 	profile?: ExportProfile,
 ): MdiPdfExportRequest {
 	if (typeof source !== "string") throw new TypeError("source must be a string");
+	if (profile !== undefined) requireLayoutSystem(profile);
 	const writingMode = parse(source).document.frontmatter?.entries.find(
 		(entry) => entry.key === "writing-mode" || entry.key === "writingMode",
 	)?.value;
@@ -61,6 +65,7 @@ export function preparePdfExportWithDiagnostics(
 	profile?: ExportProfile,
 ): MdiRenderResult<MdiPdfExportRequest> {
 	if (typeof source !== "string") throw new TypeError("source must be a string");
+	if (profile !== undefined) requireLayoutSystem(profile);
 	const parsed = parse(source);
 	const writingMode = parsed.document.frontmatter?.entries.find(
 		(entry) => entry.key === "writing-mode" || entry.key === "writingMode",

@@ -11,6 +11,7 @@ An export profile configures **presentation** — page size, fonts, margins, ind
 
 ```json
 {
+  "layout": { "system": "word" },
   "metadata": {
     "title": "The Last Station",
     "author": "A Writer",
@@ -36,20 +37,22 @@ An export profile configures **presentation** — page size, fonts, margins, ind
 }
 ```
 
-Every top-level key and every field is **optional** — `resolveExportProfile({})` returns `DEFAULT_EXPORT_PROFILE` (shown above, minus `metadata`, which defaults to `{}`). Pass only what you want to override.
+`resolveExportProfile({})` is available for internal/default resolution, but every configured CLI or `@illusions-lab/mdi` export must state `layout.system`. Choose one contract: `"japanese-publisher"` for a strict, mirrored Japanese book grid, or `"word"` for flowing Word-style pages. They are intentionally not mixed.
 
 | Field | Type | Default | Validation |
 | --- | --- | --- | --- |
+| `layout.system` | `"japanese-publisher" \| "word"` | publisher for internal resolution; **required at configured-export boundaries** | Selects the complete layout contract. |
+| `layout.marginMode` / `bindingSide` / `gutter` | `"single"\|"mirror"` / `"left"\|"right"` / mm | publisher: mirror, direction-dependent binding, 0 mm | `word` has no gutter and defaults to single margins. |
 | `metadata.title`/`author`/`publisher`/`identifier`/`language`/`date` | `string` | — | Must be a string if present. |
 | `typesetting.writingMode` | `"horizontal" \| "vertical"` | `"horizontal"` | Must be exactly one of the two. |
-| `typesetting.fontFamily` | `string` | `"serif"` | Must be a non-empty string; whitespace-only falls back to default. |
+| `typesetting.fontFamily` | `string` | Mincho fallback stack | Must be a non-empty string; whitespace-only falls back to default. |
 | `typesetting.textIndentEm` | `number` | `1` | `0`–`4`. |
 | `typesetting.fullwidthSpaceIndent` | `boolean` | `false` | — |
-| `pagination.pageSize` | one of `PAGE_SIZES` | `"A4"` | Must be a key of the exported `PAGE_DIMENSIONS` map (ISO A0–A10, JIS/ISO B0–B10, Japanese book sizes like `Bunko`/`Shinsho`/`Tankobon`, North American `Letter`/`Legal`/`Tabloid`, and postcard/photo sizes like `Hagaki`/`L-ban`). |
+| `pagination.pageSize` | one of `PAGE_SIZES` | publisher: `"Shirokuban"`; word: `"A4"` | Must be a key of the exported `PAGE_DIMENSIONS` map. |
 | `pagination.landscape` | `boolean` | `false` | — |
-| `pagination.charactersPerLine` | `number` | `40` | `10`–`60`. |
-| `pagination.linesPerPage` | `number` | `34` | `10`–`50`. |
-| `pagination.margins.{top,bottom,left,right}` | `number` (mm) | `25.4` each (1 inch) | `0`–`50`. |
+| `pagination.charactersPerLine` / `linesPerPage` | `number` | publisher horizontal: `27`×`26`; vertical: `40`×`30`; word: informational | `10`–`400`. |
+| `pagination.gridMode` | `"strict" \| "typographic"` | publisher: strict; word: typographic | `word` rejects strict; strict rejects explicit line spacing. |
+| `pagination.margins.{top,bottom,left,right}` | `number` (mm) | publisher: 16.5/18/18/15.5; word: `25.4` each | Must leave printable width and height. |
 | `pagination.pageNumbers.enabled` | `boolean` | `true` | — |
 | `pagination.pageNumbers.format` | `"simple" \| "dash" \| "fraction"` | `"simple"` | Must be one of the three. |
 | `pagination.pageNumbers.position` | one of the six `*-{left,center,right}` combinations | `"bottom-center"` | Must be one of the six. |
@@ -76,18 +79,18 @@ const profile = parseExportProfileJson(await readFile("novel.export.json", "utf8
 const resolved = resolveExportProfile(profile); // every field filled in, fully validated
 ```
 
-`resolvePrintProfile(profile, sourceWritingMode)` is a small convenience wrapper the PDF/print path uses: it lets a document's own front-matter `writing-mode` supply the default writing mode (an explicit profile always wins), and defaults `landscape: true` for vertical writing, since a vertical character grid is more readable on landscape paper.
+`resolvePrintProfile(profile, sourceWritingMode)` is the PDF/print convenience wrapper: a document's front matter supplies the writing-mode default, while an explicit profile wins. It does not silently switch paper orientation.
 
 ## Format support today
 
 | Setting | PDF | TXT / `txt-ruby` | EPUB / DOCX |
 | --- | --- | --- | --- |
-| Page geometry, fonts, page numbers | Yes | — | **Pending** — Rust's `render_epub`/`render_docx` don't read a profile yet |
-| Front-matter metadata / writing mode | Yes | — | Yes (read directly from front matter, not from the profile) |
-| Full-width-space indent | Yes | Yes (1–4 spaces via `text.indentCount`) | **Pending** |
-| Cover image, chapter split level | — | — | **Pending** |
+| Page geometry, fonts, page numbers | Yes | — | DOCX: Yes; EPUB uses typography but is reflowable |
+| Metadata / writing mode | Yes | — | EPUB / DOCX: Yes |
+| Full-width-space indent | Yes | Yes (1–4 spaces via `text.indentCount`) | EPUB / DOCX: Yes |
+| Cover image, chapter split level | — | — | EPUB: Yes |
 
-This table will change as [Rust Core API status: not yet implemented](/core/rust-api/#not-yet-implemented) shrinks — check that page for the current, authoritative status before assuming a field applies to a format not listed as supporting it here.
+The adapters package Rust-owned parsed IR; layout policy remains outside the MDI parser. EPUB cannot promise fixed physical pages because it is reflowable.
 
 ## Next steps
 

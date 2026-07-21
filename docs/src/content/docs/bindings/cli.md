@@ -31,22 +31,24 @@ mdi build <input.mdi> --to html|pdf|epub|docx|txt|txt-ruby|narou|kakuyomu|aozora
 
 The CLI reads `epub.coverPath` relative to the profile file. It must name a PNG or JPEG; the bytes are included in the EPUB only, never sent to the parser. `--config` is no longer silently ignored for EPUB or DOCX.
 
+Without `--config`, the CLI chooses its built-in layout from front matter: `writing-mode: vertical` uses `japanese-publisher`'s A4-landscape, right-bound 40×30 novel-manuscript grid; every other document uses `word`'s flowing A4 layout. Only a supplied `--config` must explicitly contain `layout.system`.
+
 ## A useful profile
 
 ```json
 {
+  "layout": { "system": "japanese-publisher" },
   "metadata": { "title": "雨の東京", "author": "Illusions", "language": "ja" },
-  "typesetting": { "writingMode": "vertical", "fontFamily": "Yu Mincho", "fontSize": 11, "lineSpacing": 1.6, "textIndentEm": 1 },
+  "typesetting": { "writingMode": "vertical", "fontFamily": "Yu Mincho", "fontSize": 10, "textIndentEm": 1 },
   "pagination": {
-    "pageSize": "A4", "charactersPerLine": 40, "linesPerPage": 30, "gridMode": "typographic",
-    "margins": { "top": 20, "right": 18, "bottom": 20, "left": 18 },
+    "pageSize": "A4", "landscape": true, "gridMode": "strict",
     "pageNumbers": { "enabled": true, "position": "bottom-center", "format": "simple" }
   },
   "epub": { "chapterSplitLevel": "h1", "coverPath": "cover.png" }
 }
 ```
 
-Without a profile, the publisher default is A4, 40 characters × 30 lines, and 20 mm top/bottom plus 18 mm left/right margins. `gridMode: "strict"` is the default: it derives type size/leading from that printable grid and rejects explicit `fontSize` or `lineSpacing`. The example selects `"typographic"` because it supplies both. A grid controls the sizing calculation; it does not certify that every page after headings, forced breaks, available fonts, and a target reader's layout contains exactly 40×30 visible glyph slots.
+When supplied, `--config` must contain `layout.system`; a profile without it is rejected. `"japanese-publisher"` is the book system: horizontal text defaults to a mirrored, left-bound `Shirokuban`/10 pt Mincho 27×26 strict grid; vertical text defaults to the mirrored, right-bound A4-landscape novel-manuscript 40×30 strict grid. `"word"` is a separate flowing system: A4, 25.4 mm margins on all four sides, no mirroring, and `gridMode: "typographic"`; it rejects strict grids.
 
 Semantic MDI parsing and source-span diagnostics remain Rust-owned. Profile values are publication policy: EPUB/DOCX adapters use them to package the parsed IR, while PDF geometry and Chromium layout are host concerns. This keeps application UI preferences and machine-specific browser behavior out of the parser.
 

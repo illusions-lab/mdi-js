@@ -8,7 +8,11 @@ import {
 	serializeMdi as serializeMdiFromRust,
 } from "@illusions-lab/mdi-core";
 import type { EpubCover, EpubExportOptions } from "@illusions-lab/mdi-to-epub";
-import type { ExportProfile, WritingMode } from "@illusions-lab/mdi-export-profile";
+import {
+	requireLayoutSystem,
+	type ExportProfile,
+	type WritingMode,
+} from "@illusions-lab/mdi-export-profile";
 import type { Root } from "mdast";
 import { parse as parseYaml } from "yaml";
 
@@ -304,7 +308,9 @@ export async function renderEpubWithProfile(
 	assertSource(source);
 	assertEpubOptions(options);
 	const { mdiToEpub } = await import("@illusions-lab/mdi-to-epub");
-	return mdiToEpub(toPublicationMdast(parse(source).document), normalizeEpubOptions(options));
+	const normalized = normalizeEpubOptions(options);
+	requireLayoutSystem(normalized.profile!);
+	return mdiToEpub(toPublicationMdast(parse(source).document), normalized);
 }
 
 /**
@@ -318,7 +324,9 @@ export async function renderDocxWithProfile(
 	assertSource(source);
 	assertPlainObject(profile, "profile");
 	const { mdiToDocx } = await import("@illusions-lab/mdi-to-docx");
-	return mdiToDocx(toPublicationMdast(parse(source).document), normalizeDocxProfile(profile));
+	const normalized = normalizeDocxProfile(profile);
+	requireLayoutSystem(normalized);
+	return mdiToDocx(toPublicationMdast(parse(source).document), normalized);
 }
 
 /**

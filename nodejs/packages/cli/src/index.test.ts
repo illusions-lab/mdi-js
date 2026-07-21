@@ -21,6 +21,21 @@ describe("mdi CLI library", () =>
       expect(await readFile(html, "utf8")).toContain("<title>Book</title>");
       const docx = await build(input, "docx");
       expect((await readFile(docx)).subarray(0, 2).toString()).toBe("PK");
+      const horizontal = await JSZip.loadAsync(await readFile(docx));
+      const horizontalXml = await horizontal.file("word/document.xml")!.async("string");
+      // CLI horizontal default is the Word A4 flowing profile, not Rust's bare baseline.
+      expect(horizontalXml).toContain('w:w="11906"');
+      expect(horizontalXml).not.toContain('w:type="linesAndChars"');
+
+      await writeFile(input, "---\nwriting-mode: vertical\n---\n本文");
+      const verticalPath = await build(input, "docx", { output: join(directory, "vertical.docx") });
+      const vertical = await JSZip.loadAsync(await readFile(verticalPath));
+      const verticalXml = await vertical.file("word/document.xml")!.async("string");
+      // CLI vertical default is the A4 landscape Japanese novel manuscript.
+      expect(verticalXml).toContain('w:w="16838"');
+      expect(verticalXml).toContain('w:h="11906"');
+      expect(verticalXml).toContain('w:textDirection w:val="tbRl"');
+      expect(verticalXml).toContain('w:linePitch="455"');
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -190,7 +205,7 @@ describe("build edge cases", () => {
       const config = join(directory, "export.json");
       await writeFile(
         config,
-        '{"epub":{"coverPath":"cover.png"},"text":{"fullwidthSpaceIndent":true,"indentCount":2}}'
+        '{"layout":{"system":"japanese-publisher"},"epub":{"coverPath":"cover.png"},"text":{"fullwidthSpaceIndent":true,"indentCount":2}}'
       );
       const profile = await loadExportProfile(config);
       expect(profile?.epub?.coverPath).toBe(join(directory, "cover.png"));
@@ -208,6 +223,7 @@ describe("build edge cases", () => {
       await writeFile(input, "# One\n\ntext\n\n# Two\n\nmore");
       await writeFile(cover, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
       const profile = {
+        layout: { system: "japanese-publisher" as const },
         metadata: { title: "Configured CLI book" },
         typesetting: { writingMode: "vertical" as const, fontFamily: "Noto Serif JP" },
         pagination: { pageSize: "A5" as const, pageNumbers: { enabled: true, position: "top-right" as const } },
@@ -222,7 +238,7 @@ describe("build edge cases", () => {
       const docx = await build(input, "docx", { profile });
       const docxZip = await JSZip.loadAsync(await readFile(docx));
       expect(await docxZip.file("word/document.xml")!.async("string")).toContain('w:textDirection w:val="tbRl"');
-      expect(await docxZip.file("word/document.xml")!.async("string")).toContain('w:w="11906"');
+      expect(await docxZip.file("word/document.xml")!.async("string")).toContain('w:w="8391"');
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -237,10 +253,10 @@ describe("build edge cases", () => {
       await writeFile(input, "text");
       await writeFile(jpeg, Buffer.from([0xff, 0xd8, 0xff, 0x00]));
       await writeFile(invalid, Buffer.from("GIF89a"));
-      const output = await build(input, "epub", { profile: { epub: { coverPath: jpeg } } });
+      const output = await build(input, "epub", { profile: { layout: { system: "word" }, epub: { coverPath: jpeg } } });
       const zip = await JSZip.loadAsync(await readFile(output));
       expect(zip.file("OEBPS/cover.jpg")).toBeTruthy();
-      await expect(build(input, "epub", { profile: { epub: { coverPath: invalid } } }))
+      await expect(build(input, "epub", { profile: { layout: { system: "word" }, epub: { coverPath: invalid } } }))
         .rejects.toThrow("EPUB cover must be a PNG or JPEG");
     } finally {
       await rm(directory, { recursive: true, force: true });

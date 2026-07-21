@@ -11,7 +11,7 @@ Rust owns the `.mdi` parse, diagnostic codes and UTF-8 spans, and semantic HTML/
 
 Publication settings are deliberately separate. EPUB/DOCX adapters apply metadata, chapters, typography, page setup, and numbering to that already-parsed IR. A host applies browser/PDF settings such as Chromium location and application UI preferences. This avoids putting platform-specific print policy into the parser.
 
-The default publisher profile is A4 with 20 mm top/bottom and 18 mm left/right margins, a 40-character × 30-line grid, and `gridMode: "strict"`. Strict mode derives body size and leading from that printable area, and rejects explicit `fontSize`/`lineSpacing` so a profile cannot quietly drift from its requested grid. Use `gridMode: "typographic"` for an explicit size or leading. This governs the renderer's sizing calculation; page content, headings, forced breaks, installed fonts, and reader/browser layout mean it is not a blanket assertion that every resulting page has exactly 40×30 visible slots.
+Configured publication exports require one explicit `layout.system`. `japanese-publisher` is the strict Japanese book contract: horizontal pages use `Shirokuban`, 10 pt Mincho, mirrored spreads, left binding, and 27×26; vertical pages use the A4-landscape novel manuscript, mirrored spreads, right binding, and 40×30. `word` is intentionally incompatible: A4, 25.4 mm on all four sides, no mirroring, and flowing `typographic` layout; it rejects `strict`.
 
 | Output | Baseline API | Configured route |
 | --- | --- | --- |

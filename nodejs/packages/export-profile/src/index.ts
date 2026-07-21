@@ -8,10 +8,17 @@ export type PageNumberPosition =
   | "bottom-center"
   | "bottom-right";
 export type ChapterSplitLevel = "h1" | "h2" | "h3" | "none";
+/** Two intentionally incompatible page-composition contracts. */
+export type LayoutSystem = "japanese-publisher" | "word";
+/** Single-sheet manuscript pages or mirrored book spreads. */
+export type MarginMode = "single" | "mirror";
+/** The physical binding side for a single-sheet manuscript. */
+export type BindingSide = "right" | "left";
 /**
  * `strict` makes the character and line counts the physical page contract.
- * `typographic` instead gives an explicit point size and line-spacing
- * multiplier precedence over that contract.
+ * `typographic` instead lets a line-spacing multiplier determine the block
+ * pitch. A strict grid may still set a font size: that controls glyph size
+ * inside each fixed manuscript cell, not the cell geometry.
  */
 export type GridMode = "strict" | "typographic";
 
@@ -32,15 +39,27 @@ export interface ExportMetadata {
 }
 
 export interface ExportProfile {
+  /**
+   * Select one composition contract for configured publication exports.
+   * `japanese-publisher` preserves a characters × lines grid; `word` uses
+   * Word Normal-style page margins and flowing paragraphs.
+   */
+  layout?: {
+    system?: LayoutSystem;
+    marginMode?: MarginMode;
+    bindingSide?: BindingSide;
+    /** Extra binding allowance in millimetres; only for publisher layout. */
+    gutter?: number;
+  };
   metadata?: ExportMetadata;
   typesetting?: {
     writingMode?: WritingMode;
     fontFamily?: string;
-    /** Body type size in points; requires `pagination.gridMode: "typographic"`. */
+    /** Body type size in points. In a strict grid this does not alter cell pitch. */
     fontSize?: number;
     /** @deprecated Use fontSize. Kept for JSON profiles written before 2.1. */
     fontSizePt?: number;
-    /** Baseline multiplier; requires `pagination.gridMode: "typographic"`. */
+    /** Baseline multiplier; only available with `pagination.gridMode: "typographic"`. */
     lineSpacing?: number;
     /** @deprecated Use lineSpacing. */
     lineHeight?: number;
@@ -77,6 +96,12 @@ export interface ExportProfile {
 }
 
 export interface ResolvedExportProfile {
+  layout: {
+    system: LayoutSystem;
+    marginMode: MarginMode;
+    bindingSide: BindingSide;
+    gutter: number;
+  };
   metadata: ExportMetadata;
   typesetting: {
     writingMode: WritingMode;
@@ -179,28 +204,188 @@ export type PageSize = keyof typeof PAGE_DIMENSIONS;
 export const PAGE_SIZES = Object.keys(PAGE_DIMENSIONS) as PageSize[];
 
 export const DEFAULT_EXPORT_PROFILE: ResolvedExportProfile = {
+  layout: {
+    system: "japanese-publisher",
+    marginMode: "mirror",
+    bindingSide: "left",
+    gutter: 0,
+  },
   metadata: {},
   typesetting: {
     writingMode: "horizontal",
-    fontFamily: "serif",
-    fontSize: undefined,
+    fontFamily: "Yu Mincho, Hiragino Mincho ProN, Noto Serif JP, serif",
+    fontSize: 10.5,
     lineSpacing: undefined,
     textIndentEm: 1,
     fullwidthSpaceIndent: false,
   },
   pagination: {
-    pageSize: "A4",
+    pageSize: "Shirokuban",
     landscape: false,
-    charactersPerLine: 40,
-    linesPerPage: 30,
+    // Japanese publisher horizontal default: 14Q, 27 characters × 26 lines.
+    charactersPerLine: 27,
+    linesPerPage: 26,
     gridMode: "strict",
-    // Publisher manuscript baseline: 40 characters × 30 lines on A4.
-    margins: { top: 20, bottom: 20, left: 18, right: 18 },
+    // Four-six book layout: node 18 / head 16.5 / fore edge 15.5 / tail 18 mm.
+    margins: { top: 16.5, bottom: 18, left: 18, right: 15.5 },
     pageNumbers: { enabled: true, format: "simple", position: "bottom-center" },
   },
   epub: { chapterSplitLevel: "h1" },
   text: { fullwidthSpaceIndent: false, indentCount: 1 },
 };
+
+const PUBLISHING_FONT_FAMILY = "Yu Mincho, Hiragino Mincho ProN, Noto Serif JP, serif";
+const PUBLISHING_FONT_SIZE_PT = 10.5;
+const MM_PER_POINT = 25.4 / 72;
+
+/**
+ * Derive a physically valid manuscript grid for every declared paper size.
+ * A4 deliberately resolves to the publisher presets. Smaller sheets reduce
+ * the count; larger sheets extend it. In both cases, a 10.5 pt Mincho glyph
+ * and a practical outer margin are retained rather than creating a giant
+ * empty page or an overflowing printable box.
+ */
+function publisherDefaults(
+  pageSize: PageSize,
+  writingMode: WritingMode,
+  landscape: boolean,
+  bindingSide: BindingSide,
+) {
+  const dimensions = PAGE_DIMENSIONS[pageSize];
+  const width = landscape ? dimensions.height : dimensions.width;
+  const height = landscape ? dimensions.width : dimensions.height;
+  const baseGlyph = PUBLISHING_FONT_SIZE_PT * MM_PER_POINT;
+  const minimumOuter = Math.min(18, Math.min(width, height) * 0.085);
+  // A4 and smaller retain conventional manuscript counts. Larger sheets use
+  // the same physical type size and expand their grid instead of gaining an
+  // implausibly large field of white space.
+  const expandsBeyondA4 = width * height > 210 * 297;
+  const maximumCharacters = expandsBeyondA4 ? 400 : 40;
+
+  // The published four-six standard (14Q) is the common book default. It is
+  // intentionally separate from A4 newcomer-award manuscript presets.
+  if (pageSize === "Shirokuban" && !landscape) {
+    const node = 18;
+    const foreEdge = 15.5;
+    const margins = {
+      top: 16.5,
+      bottom: 18,
+      left: bindingSide === "left" ? node : foreEdge,
+      right: bindingSide === "right" ? node : foreEdge,
+    };
+    return writingMode === "vertical"
+      ? {
+          fontFamily: PUBLISHING_FONT_FAMILY,
+          fontSize: 10,
+          pageSize,
+          landscape,
+          charactersPerLine: 40,
+          linesPerPage: 15,
+          margins,
+        }
+      : {
+          fontFamily: PUBLISHING_FONT_FAMILY,
+          fontSize: 10,
+          pageSize,
+          landscape,
+          charactersPerLine: 27,
+          linesPerPage: 26,
+          margins,
+        };
+  }
+
+  // Japanese fiction manuscripts conventionally use A4 landscape for vertical
+  // writing: 40 characters down × 30 columns across.  The 10.5 pt Mincho
+  // glyph pitch fixes the 40-character inline extent; 28 mm at the right is
+  // reserved for right-side binding, with a matching practical fore edge.
+  if (pageSize === "A4" && landscape && writingMode === "vertical") {
+    return {
+      fontFamily: PUBLISHING_FONT_FAMILY,
+      fontSize: PUBLISHING_FONT_SIZE_PT,
+      pageSize,
+      landscape,
+      charactersPerLine: 40,
+      linesPerPage: 30,
+      margins: {
+        top: 30.91666666666667,
+        bottom: 30.91666666666667,
+        left: 28,
+        right: 28,
+      },
+    };
+  }
+
+  if (writingMode === "vertical") {
+    // Scale the A4 28 mm binding allowance with the page width, but keep an
+    // outside margin so a small book remains physically readable.
+    const binding = Math.min(width * 0.22, Math.max(8, width * (28 / 210)));
+    const characters = Math.max(10, Math.min(maximumCharacters, Math.floor((height - 2 * minimumOuter) / baseGlyph)));
+    const lines = Math.max(10, Math.min(expandsBeyondA4 ? 400 : 30, Math.floor((width - binding - minimumOuter) / baseGlyph)));
+    const glyph = Math.min(
+      baseGlyph,
+      (height - 2 * minimumOuter) / characters,
+      (width - binding - minimumOuter) / lines,
+    );
+    return {
+      fontFamily: PUBLISHING_FONT_FAMILY,
+      fontSize: glyph / MM_PER_POINT,
+      pageSize,
+      landscape,
+      charactersPerLine: characters,
+      linesPerPage: lines,
+      margins: {
+        top: (height - characters * glyph) / 2,
+        bottom: (height - characters * glyph) / 2,
+        left: bindingSide === "left" ? binding : width - binding - lines * glyph,
+        right: bindingSide === "right" ? binding : width - binding - lines * glyph,
+      },
+    };
+  }
+
+  const characters = Math.max(10, Math.min(maximumCharacters, Math.floor((width - 2 * minimumOuter) / baseGlyph)));
+  const glyph = Math.min(baseGlyph, (width - 2 * minimumOuter) / characters);
+  const horizontalMargin = (width - characters * glyph) / 2;
+  const verticalMargin = Math.max(6, Math.min(20, height * 0.1));
+  const lines = Math.max(10, Math.min(expandsBeyondA4 ? 400 : 50, Math.floor((height - 2 * verticalMargin) / (glyph * 1.5))));
+  return {
+    fontFamily: PUBLISHING_FONT_FAMILY,
+    fontSize: glyph / MM_PER_POINT,
+    pageSize,
+    landscape,
+    charactersPerLine: characters,
+    linesPerPage: lines,
+    margins: { top: verticalMargin, bottom: verticalMargin, left: horizontalMargin, right: horizontalMargin },
+  };
+}
+
+/**
+ * Word's Normal document uses one-inch margins. This layout deliberately
+ * uses flowing typography instead of treating characters × lines as a page
+ * contract; the calculated counts are informational defaults only.
+ */
+function wordDefaults(
+  pageSize: PageSize,
+  writingMode: WritingMode,
+  landscape: boolean,
+) {
+  const dimensions = PAGE_DIMENSIONS[pageSize];
+  const width = landscape ? dimensions.height : dimensions.width;
+  const height = landscape ? dimensions.width : dimensions.height;
+  // Retain Word Normal's full one-inch margin whenever it physically fits.
+  const margin = Math.min(25.4, Math.max(6, Math.min(width, height) / 2 - 1));
+  const glyph = PUBLISHING_FONT_SIZE_PT * MM_PER_POINT;
+  const inlineExtent = writingMode === "vertical" ? height - 2 * margin : width - 2 * margin;
+  const crossExtent = writingMode === "vertical" ? width - 2 * margin : height - 2 * margin;
+  return {
+    fontFamily: PUBLISHING_FONT_FAMILY,
+    fontSize: PUBLISHING_FONT_SIZE_PT,
+    pageSize,
+    landscape,
+    charactersPerLine: Math.max(10, Math.min(400, Math.floor(inlineExtent / glyph))),
+    linesPerPage: Math.max(10, Math.min(400, Math.floor(crossExtent / (glyph * 1.15)))),
+    margins: { top: margin, bottom: margin, left: margin, right: margin },
+  };
+}
 
 /** Validates and fills an export profile without silently accepting bad layout data. */
 export function resolveExportProfile(
@@ -223,18 +408,42 @@ export function resolveExportProfile(
   };
   requireObject(profile.typesetting, "typesetting");
   requireObject(profile.pagination, "pagination");
+  requireObject(profile.layout, "layout");
   requireObject(profile.epub, "epub");
   requireObject(profile.text, "text");
   requireObject(profile.metadata, "metadata");
   const typesetting = profile.typesetting ?? {};
   const pagination = profile.pagination ?? {};
+  const layout = profile.layout ?? {};
   const text = profile.text ?? {};
   requireObject(pagination.pageNumbers, "pagination.pageNumbers");
   requireObject(pagination.margins, "pagination.margins");
   const pageNumbers = pagination.pageNumbers ?? {};
   const margins = pagination.margins ?? {};
-  const pageSize =
-    pagination.pageSize ?? DEFAULT_EXPORT_PROFILE.pagination.pageSize;
+  const writingMode =
+    typesetting.writingMode ?? DEFAULT_EXPORT_PROFILE.typesetting.writingMode;
+  if (writingMode !== "vertical" && writingMode !== "horizontal")
+    throw new Error("writingMode must be vertical or horizontal");
+  const layoutSystem = layout.system ?? DEFAULT_EXPORT_PROFILE.layout.system;
+  if (layoutSystem !== "japanese-publisher" && layoutSystem !== "word")
+    throw new Error("layout.system must be japanese-publisher or word");
+  const marginMode = layout.marginMode ?? (
+    layoutSystem === "japanese-publisher" ? "mirror" : "single"
+  );
+  if (marginMode !== "single" && marginMode !== "mirror")
+    throw new Error("layout.marginMode must be single or mirror");
+  const bindingSide = layout.bindingSide ?? (
+    layoutSystem === "japanese-publisher"
+      ? writingMode === "vertical" ? "right" : "left"
+      : "left"
+  );
+  if (bindingSide !== "right" && bindingSide !== "left")
+    throw new Error("layout.bindingSide must be right or left");
+  const pageSize = pagination.pageSize ?? (
+    layoutSystem === "japanese-publisher"
+      ? writingMode === "vertical" ? "A4" : "Shirokuban"
+      : "A4"
+  );
   for (const [key, value] of Object.entries(profile.metadata ?? {}))
     if (value !== undefined && typeof value !== "string")
       throw new Error(`metadata.${key} must be a string`);
@@ -262,12 +471,18 @@ export function resolveExportProfile(
     throw new Error("coverPath must be a string");
   if (typeof pageSize !== "string" || !(pageSize in PAGE_DIMENSIONS))
     throw new Error(`Unsupported page size: ${String(pageSize)}`);
-  if (
-    typesetting.writingMode !== undefined &&
-    typesetting.writingMode !== "vertical" &&
-    typesetting.writingMode !== "horizontal"
-  )
-    throw new Error("writingMode must be vertical or horizontal");
+  if (pagination.landscape !== undefined && typeof pagination.landscape !== "boolean")
+    throw new Error("landscape must be a boolean");
+  const landscape = pagination.landscape ?? (
+    layoutSystem === "japanese-publisher" &&
+    writingMode === "vertical" &&
+    pageSize === "A4"
+      ? true
+      : DEFAULT_EXPORT_PROFILE.pagination.landscape
+  );
+  const modeDefaults = layoutSystem === "word"
+    ? wordDefaults(pageSize, writingMode, landscape)
+    : publisherDefaults(pageSize, writingMode, landscape, bindingSide);
   if (
     profile.epub?.chapterSplitLevel !== undefined &&
     !["h1", "h2", "h3", "none"].includes(profile.epub.chapterSplitLevel)
@@ -315,73 +530,82 @@ export function resolveExportProfile(
   // including photo/card formats. A4 and larger retain the publisher baseline;
   // only an omitted margin is reduced for a smaller sheet.
   const dimensions = PAGE_DIMENSIONS[pageSize];
-  const pageWidth = pagination.landscape ? dimensions.height : dimensions.width;
-  const pageHeight = pagination.landscape ? dimensions.width : dimensions.height;
-  const defaultHorizontalMargin = Math.min(
-    DEFAULT_EXPORT_PROFILE.pagination.margins.left,
-    pageWidth * 0.1
+  const pageWidth = landscape ? dimensions.height : dimensions.width;
+  const pageHeight = landscape ? dimensions.width : dimensions.height;
+  const gutter = number(
+    layout.gutter,
+    DEFAULT_EXPORT_PROFILE.layout.gutter,
+    0,
+    Math.min(pageWidth, pageHeight) / 3,
+    "layout.gutter"
   );
-  const defaultVerticalMargin = Math.min(
-    DEFAULT_EXPORT_PROFILE.pagination.margins.top,
-    pageHeight * 0.1
-  );
+  if (layoutSystem === "word" && gutter !== 0)
+    throw new Error("layout.gutter is only available with japanese-publisher layout");
   const resolvedMargins: Margins = {
     top: number(
       margins.top,
-      defaultVerticalMargin,
+      modeDefaults.margins.top,
       0,
-      50,
+      pageHeight - 1,
       "top margin"
     ),
     bottom: number(
       margins.bottom,
-      defaultVerticalMargin,
+      modeDefaults.margins.bottom,
       0,
-      50,
+      pageHeight - 1,
       "bottom margin"
     ),
     left: number(
       margins.left,
-      defaultHorizontalMargin,
+      modeDefaults.margins.left,
       0,
-      50,
+      pageWidth - 1,
       "left margin"
     ),
     right: number(
       margins.right,
-      defaultHorizontalMargin,
+      modeDefaults.margins.right,
       0,
-      50,
+      pageWidth - 1,
       "right margin"
     ),
   };
+  if (layoutSystem === "japanese-publisher" && gutter > 0) {
+    const bindingEdge = bindingSide === "right" ? "right" : "left";
+    resolvedMargins[bindingEdge] += gutter;
+  }
   const fontSize = typesetting.fontSize ?? typesetting.fontSizePt;
   const lineSpacing = typesetting.lineSpacing ?? typesetting.lineHeight;
-  const gridMode = pagination.gridMode ?? DEFAULT_EXPORT_PROFILE.pagination.gridMode;
+  const gridMode = pagination.gridMode ?? (
+    layoutSystem === "word" ? "typographic" : DEFAULT_EXPORT_PROFILE.pagination.gridMode
+  );
   if (gridMode !== "strict" && gridMode !== "typographic")
     throw new Error("gridMode must be strict or typographic");
-  if (gridMode === "strict" && (fontSize !== undefined || lineSpacing !== undefined))
+  if (layoutSystem === "word" && gridMode === "strict")
+    throw new Error("layout.system: word uses flowing typography, not a strict manuscript grid");
+  if (gridMode === "strict" && lineSpacing !== undefined)
     throw new Error(
-      "fontSize and lineSpacing require pagination.gridMode: typographic; strict grid preserves charactersPerLine × linesPerPage"
+      "lineSpacing requires pagination.gridMode: typographic; strict grid preserves its physical manuscript cells"
     );
   if (resolvedMargins.left + resolvedMargins.right >= pageWidth)
     throw new Error("left and right margins must leave printable page width");
   if (resolvedMargins.top + resolvedMargins.bottom >= pageHeight)
     throw new Error("top and bottom margins must leave printable page height");
   return {
+    layout: {
+      system: layoutSystem,
+      marginMode,
+      bindingSide,
+      gutter,
+    },
     metadata: { ...profile.metadata },
     typesetting: {
-      writingMode:
-        typesetting.writingMode ??
-        DEFAULT_EXPORT_PROFILE.typesetting.writingMode,
+      writingMode,
       fontFamily:
         typesetting.fontFamily?.trim() ||
-        DEFAULT_EXPORT_PROFILE.typesetting.fontFamily,
-      ...(fontSize === undefined
-        ? {}
-        : {
-            fontSize: number(fontSize, 0, 4, 72, "fontSize"),
-          }),
+        modeDefaults.fontFamily,
+      fontSize: number(fontSize, modeDefaults.fontSize, 4, 72, "fontSize"),
       ...(lineSpacing === undefined
         ? {}
         : {
@@ -402,23 +626,19 @@ export function resolveExportProfile(
     },
     pagination: {
       pageSize,
-      landscape: boolean(
-        pagination.landscape,
-        DEFAULT_EXPORT_PROFILE.pagination.landscape,
-        "landscape"
-      ),
+      landscape,
       charactersPerLine: number(
         pagination.charactersPerLine,
-        DEFAULT_EXPORT_PROFILE.pagination.charactersPerLine,
+        modeDefaults.charactersPerLine,
         10,
-        60,
+        400,
         "charactersPerLine"
       ),
       linesPerPage: number(
         pagination.linesPerPage,
-        DEFAULT_EXPORT_PROFILE.pagination.linesPerPage,
+        modeDefaults.linesPerPage,
         10,
-        50,
+        400,
         "linesPerPage"
       ),
       gridMode,
@@ -464,8 +684,11 @@ export function resolveExportProfile(
  * Resolves the profile used for a document export.
  *
  * A document's front matter supplies the writing-mode default, while an
- * explicit export profile always wins. Vertical Japanese composition defaults
- * to landscape paper so the default character grid remains readable.
+ * explicit export profile always wins. The publisher contract defaults to the
+ * researched four-six book layout for horizontal pages (left-bound 27 × 26)
+ * and the A4-landscape novel manuscript for vertical pages (right-bound
+ * 40 × 30). Other declared paper sizes retain the same physical Mincho grid
+ * where it fits, then derive safe counts.
  */
 export function resolvePrintProfile(
   profile: ExportProfile | undefined,
@@ -477,11 +700,16 @@ export function resolvePrintProfile(
   return resolveExportProfile({
     ...profile,
     typesetting: { ...profile?.typesetting, writingMode },
-    pagination: {
-      ...profile?.pagination,
-      landscape: profile?.pagination?.landscape ?? writingMode === "vertical",
-    },
+    pagination: { ...profile?.pagination },
   });
+}
+
+/** Require an explicit system at a configured-export boundary. */
+export function requireLayoutSystem(profile: ExportProfile): void {
+  if (profile.layout?.system === undefined)
+    throw new Error(
+      "Configured exports require layout.system: japanese-publisher or word"
+    );
 }
 
 /** Parse a JSON profile for the CLI; malformed JSON never falls back silently. */
@@ -494,5 +722,6 @@ export function parseExportProfileJson(source: string): ResolvedExportProfile {
   }
   if (!raw || typeof raw !== "object" || Array.isArray(raw))
     throw new Error("Export profile must be a JSON object");
+  requireLayoutSystem(raw as ExportProfile);
   return resolveExportProfile(raw as ExportProfile);
 }

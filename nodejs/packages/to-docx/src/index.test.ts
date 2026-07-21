@@ -54,25 +54,25 @@ describe("DOCX heading styles", () => {
 });
 
 describe("DOCX print defaults", () => {
-  it("writes the strict A4 40 × 30 publisher grid and black heading styles", async () => {
+  it("writes the strict horizontal four-six publisher grid and black heading styles", async () => {
     const zip = await JSZip.loadAsync(
       await mdiToDocx(parse("# Heading\n\nBody text"))
     );
     const document = await zip.file("word/document.xml")!.async("string");
     const styles = await zip.file("word/styles.xml")!.async("string");
-    expect(document).toContain('w:w="11906"'); // A4 width in twips
-    expect(document).toContain('w:h="16838"'); // A4 height in twips
+    expect(document).toContain('w:w="7200"'); // Shirokuban width in twips
+    expect(document).toContain('w:h="10658"'); // Shirokuban height in twips
     expect(document).toContain(
-      'w:top="1134" w:right="1020" w:bottom="1134" w:left="1020"'
+      'w:top="935" w:right="879" w:bottom="1020" w:left="1020"'
     );
     expect(document).toContain('w:type="linesAndChars"');
     // OOXML's omitted charSpace is its zero (one full-width character) default.
     expect(document).not.toContain('w:charSpace="');
-    // 257 mm printable height / 30 lines, encoded as twentieths of a point.
-    expect(document).toContain('w:linePitch="486"');
+    // 153.5 mm printable height / 26 lines, encoded in twentieths of a point.
+    expect(document).toContain('w:linePitch="335"');
     // A strict manuscript heading remains one grid cell tall; hierarchy is
     // conveyed by bold/outline rather than a larger physical line.
-    expect(styles).toMatch(/w:styleId="Heading1"[\s\S]*?w:sz w:val="25"/);
+    expect(styles).toMatch(/w:styleId="Heading1"[\s\S]*?w:sz w:val="20"/);
     expect(document).not.toContain("w:textDirection");
     expect(styles).toMatch(
       /w:styleId="Heading1"[\s\S]*?w:color w:val="000000"/
@@ -90,6 +90,9 @@ describe("DOCX print defaults", () => {
     const document = await zip.file("word/document.xml")!.async("string");
     const footnotes = await zip.file("word/footnotes.xml")!.async("string");
     expect(document).toContain('w:textDirection w:val="tbRl"');
+    expect(document).toContain('w:w="16838"'); // A4 landscape width in twips
+    expect(document).toContain('w:h="11906"'); // A4 landscape height in twips
+    expect(document).toContain('w:top="1753" w:right="1587" w:bottom="1753" w:left="1587"');
     expect(document).toContain("<w:ruby ");
     expect(document).toContain("<w:eastAsianLayout");
     expect(document).toContain('<w:footnoteReference w:id="1"/>');
@@ -105,8 +108,24 @@ describe("DOCX print defaults", () => {
     const document = await zip.file("word/document.xml")!.async("string");
     expect(document).toContain('<w:pStyle w:val="Heading1"/>');
     expect(document).toContain(
-      '<w:rubyPr><w:rubyAlign w:val="center"/><w:hps w:val="12"/><w:hpsRaise w:val="18"/><w:hpsBaseText w:val="24"/>'
+      '<w:rubyPr><w:rubyAlign w:val="center"/><w:hps w:val="11"/><w:hpsRaise w:val="18"/><w:hpsBaseText w:val="21"/>'
     );
+  });
+
+  it("writes mirror-margin settings for books and flips the gutter for right-bound vertical text", async () => {
+    const vertical = await JSZip.loadAsync(
+      await mdiToDocx(parse("---\nwriting-mode: vertical\n---\n本文"))
+    );
+    const verticalSettings = await vertical.file("word/settings.xml")!.async("string");
+    expect(verticalSettings).toContain("<w:mirrorMargins");
+    expect(verticalSettings).toContain("<w:rtlGutter");
+
+    const word = await JSZip.loadAsync(
+      await mdiToDocx(parse("本文"), { layout: { system: "word" } })
+    );
+    const wordSettings = await word.file("word/settings.xml")!.async("string");
+    expect(wordSettings).not.toContain("<w:mirrorMargins");
+    expect(wordSettings).not.toContain("<w:rtlGutter");
   });
 });
 

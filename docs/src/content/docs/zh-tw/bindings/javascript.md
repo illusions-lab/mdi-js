@@ -44,6 +44,7 @@ await writeFile("book.docx", renderDocx(source));
 
 ```ts
 const epub = await renderEpub(source, {
+  profile: { layout: { system: "japanese-publisher" } },
   title: "雨の東京", author: "Illusions", language: "ja",
   publisher: "Illusions Lab", identifier: "urn:isbn:example", date: "2026-07-21",
   verticalWriting: true, fontFamily: "Yu Mincho", textIndent: 1,
@@ -51,6 +52,7 @@ const epub = await renderEpub(source, {
 });
 
 const docx = await renderDocx(source, {
+  layout: { system: "word" },
   title: "雨の東京", author: "Illusions", verticalWriting: true,
   fontFamily: "Yu Mincho", fontSize: 11, lineSpacing: 1.6, textIndent: 1,
   pagination: { gridMode: "typographic" },
@@ -62,7 +64,7 @@ const docx = await renderDocx(source, {
 
 EPUB 支援 metadata、直排、font、indent、`h1`/`h2`/`h3`/`none` chapter split，以及 PNG/JPEG `Uint8Array` cover。DOCX 支援 metadata、page size/orientation/margin、font/size/line spacing/indent、page number（`simple`/`dash`/`fraction`）。兩者亦支援完整 nested `ExportProfile`；完整 JSON schema 見 [export profiles](/zh-tw/ecosystem/export-profiles/)。
 
-預設 publication profile 是 A4、40 字 × 30 行、上下 20 mm、左右 18 mm。`pagination.gridMode` 預設為 `"strict"`：adapter 從 printable area/grid 推導 body size 與 line height，並拒絕 `fontSize` 或 `lineSpacing`，避免設定無聲偏離 grid。若 point size/line spacing 比 grid 更重要，設 `gridMode: "typographic"`。這是 sizing contract，不保證 heading、強制 break、font、reader layout 等實際因素後的每一頁都恰有 40×30 glyph slots。
+每個設定型 export 都必須寫出 `layout.system`。`"japanese-publisher"` 用於鏡像的日文書籍：橫書預設為 10 pt 明朝體與 `Shirokuban`、左裝訂 27 字 × 26 行 strict grid；直書預設為 A4 landscape 小說原稿、右裝訂 40 字 × 30 行 strict grid。`"word"` 用於 Word 式流動頁面：預設 A4、四邊 25.4 mm、無鏡像、`gridMode: "typographic"`；`"word"` 會拒絕 `"strict"`。
 
 ## 設定的所有權與 DOCX 限制
 

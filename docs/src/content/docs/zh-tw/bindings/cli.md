@@ -31,17 +31,20 @@ input 為 UTF-8。`--to` 必填；`-o` 覆寫 output path 且不可與 `txt-all`
 
 CLI 以 profile file 為基準讀取 `epub.coverPath`，只接受 PNG/JPEG；cover bytes 只放進 EPUB，不傳給 parser。`--config` 不再被 EPUB/DOCX 靜默忽略。
 
+沒有 `--config` 時，CLI 依 front matter 選擇 built-in layout：`writing-mode: vertical` 使用 `japanese-publisher` 的 A4 landscape、右裝訂 40×30 小說原稿 grid；其他文件使用 `word` 的流動 A4 layout。只有明確提供的 `--config` 必須包含 `layout.system`。
+
 ## profile 範例
 
 ```json
 {
+  "layout": { "system": "japanese-publisher" },
   "metadata": { "title": "雨の東京", "author": "Illusions", "language": "ja" },
-  "typesetting": { "writingMode": "vertical", "fontFamily": "Yu Mincho", "fontSize": 11, "lineSpacing": 1.6, "textIndentEm": 1 },
-  "pagination": { "pageSize": "A4", "charactersPerLine": 40, "linesPerPage": 30, "gridMode": "typographic", "margins": { "top": 20, "right": 18, "bottom": 20, "left": 18 }, "pageNumbers": { "enabled": true, "position": "bottom-center", "format": "simple" } },
+  "typesetting": { "writingMode": "vertical", "fontFamily": "Yu Mincho", "fontSize": 10, "textIndentEm": 1 },
+  "pagination": { "pageSize": "A4", "landscape": true, "gridMode": "strict", "pageNumbers": { "enabled": true, "position": "bottom-center", "format": "simple" } },
   "epub": { "chapterSplitLevel": "h1", "coverPath": "cover.png" }
 }
 ```
 
-未提供 profile 時 publisher default 為 A4、40 字 × 30 行、上下 20 mm、左右 18 mm。`gridMode: "strict"` 是預設：它由 grid 推導 type size/leading，並拒絕明確的 `fontSize`/`lineSpacing`。本例同時指定兩者，所以選擇 `"typographic"`。grid 控制的是 sizing calculation；heading、強制 break、可用 font、target reader layout 後，並不認證每頁必定恰為 40×30 glyph slots。
+明確提供的 `--config` 必須含有 `layout.system`，缺少時 profile 會被拒絕。`"japanese-publisher"` 是書籍 system：橫書預設為 `Shirokuban`/10 pt 明朝體、鏡像左裝訂 27×26 strict grid；直書預設為 A4 landscape 小說原稿、鏡像右裝訂 40×30 strict grid。`"word"` 是另一個流動 system：A4、四邊 25.4 mm、無鏡像、`gridMode: "typographic"`，不能使用 strict grid。
 
 MDI parse/diagnostic/span 的所有權在 Rust。profile 是 publication policy，而 PDF geometry 與 Chromium layout 是 host policy。PDF 需要 `@illusions-lab/mdi-to-pdf` 與 local Chromium；Chromium 收到的是完成 HTML，不是 `.mdi`。DOCX 支援 page/type/numbering，卻不保證 ruby、tate-chu-yoko、禁則/不換行、kern、blank paragraph 與 browser 排版像素一致，請在目標 reader 驗證。

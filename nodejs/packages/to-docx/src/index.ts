@@ -86,6 +86,16 @@ export async function mdiToDocx(
     : (options.typesetting.fontSize / 72) * 25.4;
   const fontSizeHalfPoints = Math.round((fontSizeMm / 25.4) * 72 * 2);
   const strictGrid = options.pagination.gridMode === "strict";
+  const characterPitchPoints =
+    (primary / options.pagination.charactersPerLine / 25.4) * 72;
+  // ECMA-376 defines docGrid.charSpace as the point-pitch delta × 4096.
+  // Only emit a positive value: Word's grid accepts the normal-font pitch as
+  // its floor, so forcing a negative value would create invalid/interoperable
+  // OOXML rather than a trustworthy manuscript grid.
+  const characterSpace = Math.max(
+    0,
+    Math.round((characterPitchPoints - fontSizeHalfPoints / 2) * 4096)
+  );
   const lineTwips = options.typesetting.lineSpacing === undefined
     ? Math.round((cross / options.pagination.linesPerPage / 25.4) * 1440)
     : Math.round(fontSizeHalfPoints * 10 * options.typesetting.lineSpacing);
@@ -186,16 +196,15 @@ export async function mdiToDocx(
                 }
               : {}),
           },
-          // Word's document grid is the only portable OOXML mechanism that
-          // expresses a publisher's characters × lines contract. The body
-          // font is derived from the inline extent, and linePitch from the
-          // block extent, so charSpace 0 means one full-width character per
-          // calculated cell rather than an arbitrary visual approximation.
+          // Word's document grid is the portable OOXML mechanism that records
+          // a publisher's characters × lines contract. `linePitch` comes from
+          // the resolved physical block extent; the matching PDF profile uses
+          // the same resolved page geometry.
           ...(strictGrid
             ? {
                 grid: {
                   type: "linesAndChars" as const,
-                  charSpace: 0,
+                  ...(characterSpace === 0 ? {} : { charSpace: characterSpace }),
                   linePitch: lineTwips,
                 },
               }
@@ -205,7 +214,23 @@ export async function mdiToDocx(
       },
     ],
   });
+  addBookMarginSettings(document, options);
   return Packer.toBuffer(document);
+}
+
+/** Add the OOXML settings Word uses for mirrored spreads and right binding. */
+function addBookMarginSettings(document: Document, options: ResolvedExportProfile): void {
+  if (options.layout.marginMode !== "mirror") return;
+  const namespace = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  document.Settings.addChildElement(
+    ImportedXmlComponent.fromXmlString(`<w:mirrorMargins ${namespace}/>`),
+  );
+  // Word's mirrored-margin convention assumes a left-side gutter. Japanese
+  // vertical books bind on the right, so signal the reversed gutter side.
+  if (options.layout.bindingSide === "right")
+    document.Settings.addChildElement(
+      ImportedXmlComponent.fromXmlString(`<w:rtlGutter ${namespace}/>`),
+    );
 }
 
 /** Word's built-in Heading styles are blue by default; MDI uses a black print hierarchy. */
@@ -404,22 +429,10 @@ function paragraph(
   style: string | undefined,
   context: DocxContext
 ): Paragraph {
-  const fontSizeMm = options.typesetting.fontSize === undefined ? (() => {
-    const dimensions = PAGE_DIMENSIONS[options.pagination.pageSize];
-    const primary =
-      options.typesetting.writingMode === "vertical"
-        ? (options.pagination.landscape
-            ? dimensions.width
-            : dimensions.height) -
-          options.pagination.margins.top -
-          options.pagination.margins.bottom
-        : (options.pagination.landscape
-            ? dimensions.height
-            : dimensions.width) -
-          options.pagination.margins.left -
-          options.pagination.margins.right;
-    return primary / options.pagination.charactersPerLine;
-  })() : (options.typesetting.fontSize / 72) * 25.4;
+  // `resolveExportProfile` always supplies a physical body point size. Keep
+  // DOCX on that single source of truth rather than retaining an unreachable
+  // geometry fallback here.
+  const fontSizeMm = (options.typesetting.fontSize! / 72) * 25.4;
   const prefix = options.typesetting.fullwidthSpaceIndent
     ? [new TextRun("　".repeat(Math.round(options.typesetting.textIndentEm)))]
     : [];
@@ -540,15 +553,8 @@ function mmToTwips(mm: number): number {
 
 /** Body size is the inline extent divided by the publisher's character count. */
 function bodyFontSizeHalfPoints(options: ResolvedExportProfile): number {
-  if (options.typesetting.fontSize !== undefined)
-    return Math.round(options.typesetting.fontSize * 2);
-  const dimensions = PAGE_DIMENSIONS[options.pagination.pageSize];
-  const widthMm = options.pagination.landscape ? dimensions.height : dimensions.width;
-  const heightMm = options.pagination.landscape ? dimensions.width : dimensions.height;
-  const inlineExtent = options.typesetting.writingMode === "vertical"
-    ? heightMm - options.pagination.margins.top - options.pagination.margins.bottom
-    : widthMm - options.pagination.margins.left - options.pagination.margins.right;
-  return Math.round((inlineExtent / options.pagination.charactersPerLine / 25.4) * 72 * 2);
+  // `resolveExportProfile` is called before conversion, so this is defined.
+  return Math.round(options.typesetting.fontSize! * 2);
 }
 function rubyXml(base: string, reading: string | string[], baseTextSize = 24): string {
   const text = Array.isArray(reading) ? reading.join(".") : reading;

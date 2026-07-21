@@ -49,6 +49,7 @@ Use the two-argument overloads (or their explicit `WithProfile` names) for a pub
 import { renderEpub, renderDocx } from "@illusions-lab/mdi";
 
 const epub = await renderEpub(source, {
+  profile: { layout: { system: "japanese-publisher" } },
   title: "雨の東京",
   author: "Illusions",
   language: "ja",
@@ -64,6 +65,7 @@ const epub = await renderEpub(source, {
 });
 
 const docx = await renderDocx(source, {
+  layout: { system: "word" },
   title: "雨の東京",
   author: "Illusions",
   verticalWriting: true,
@@ -83,7 +85,7 @@ const docx = await renderDocx(source, {
 
 Both configured calls also accept the full nested `ExportProfile` schema through `profile` (EPUB) or directly (DOCX). The short fields above are aliases: EPUB supports metadata, writing direction, typeface, indent, chapter split, and a PNG/JPEG `Uint8Array` cover; DOCX supports metadata, direction, page size/orientation/margins, typeface/size/line spacing/indent, and page numbering (`simple`, `dash`, or `fraction`). See [Export profiles](/ecosystem/export-profiles/) for the complete JSON shape.
 
-The default publication profile is A4, 40 characters × 30 lines, with 20 mm top/bottom and 18 mm left/right margins. Its `pagination.gridMode` is `"strict"`: the adapters derive the body size and line height from the printable area and reject `fontSize` or `lineSpacing`, rather than silently changing the requested grid. Set `gridMode: "typographic"` when an explicit point size or line-spacing matters more than the grid. This is a sizing contract, not a promise that every real-world page (headings, explicit breaks, reader layout, and fonts can intervene) contains exactly 40×30 glyph slots.
+Every configured export must state `layout.system`. Choose `"japanese-publisher"` for a mirrored Japanese book: horizontal text defaults to 10 pt Mincho on `Shirokuban`, with a strict 27-character × 26-line left-bound grid; vertical text defaults to the A4-landscape novel manuscript, a strict 40-character × 30-line right-bound grid. Choose `"word"` for Word-style flowing pages: its default is A4 with 25.4 mm on every side, no mirror margins, and `gridMode: "typographic"`; `"word"` rejects `"strict"`.
 
 ## What remains the semantic owner
 

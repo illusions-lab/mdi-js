@@ -11,7 +11,7 @@ Rust は `.mdi` parse、diagnostic code と UTF-8 span、semantic HTML/baseline 
 
 EPUB/DOCX adapter は既に parse 済みの Rust IR に metadata、chapter、typography、page setup、numbering を適用します。Chromium path や application UI preference は host の設定です。platform 固有の print policy を parser に混ぜません。
 
-default publisher profile は A4、上下 20 mm・左右 18 mm、40 字 × 30 行、`gridMode: "strict"` です。strict は printable area と grid から body size/leading を導出し、`fontSize`/`lineSpacing` を reject して設定が grid から静かにずれないようにします。explicit size/leading を優先するなら `gridMode: "typographic"` を使います。これは renderer の sizing calculation の契約であり、content、heading、強制 break、installed font、reader/browser layout を越えて各 page が正確に 40×30 glyph slot になるという主張ではありません。
+設定付き publication export は `layout.system` を明示します。`japanese-publisher` は strict な和文 book contract です。横書きは `Shirokuban`・10 pt 明朝体・mirror spread・左綴じ 27×26、縦書きは A4 landscape 小説原稿・mirror spread・右綴じ 40×30 です。`word` は意図的に別契約で、A4、四辺 25.4 mm、mirror なし、flowing `typographic` layout を使い、`strict` を reject します。
 
 | 出力 | baseline | 設定付き route |
 | --- | --- | --- |

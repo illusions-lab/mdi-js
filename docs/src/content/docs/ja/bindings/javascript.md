@@ -44,6 +44,7 @@ publication 設定が必要なら二引数 overload（または `WithProfile`）
 
 ```ts
 const epub = await renderEpub(source, {
+  profile: { layout: { system: "japanese-publisher" } },
   title: "雨の東京", author: "Illusions", language: "ja",
   publisher: "Illusions Lab", identifier: "urn:isbn:example", date: "2026-07-21",
   verticalWriting: true, fontFamily: "Yu Mincho", textIndent: 1,
@@ -51,6 +52,7 @@ const epub = await renderEpub(source, {
 });
 
 const docx = await renderDocx(source, {
+  layout: { system: "word" },
   title: "雨の東京", author: "Illusions", verticalWriting: true,
   fontFamily: "Yu Mincho", fontSize: 11, lineSpacing: 1.6, textIndent: 1,
   pagination: { gridMode: "typographic" },
@@ -62,7 +64,7 @@ const docx = await renderDocx(source, {
 
 EPUB は metadata、縦書き、font、indent、`h1`/`h2`/`h3`/`none` chapter split、PNG/JPEG `Uint8Array` cover を扱います。DOCX は metadata、page size/orientation/margin、font/size/line spacing/indent、page number（`simple`/`dash`/`fraction`）を扱います。どちらも full nested `ExportProfile` も使えます。JSON の全 schema は [Export profiles](/ja/ecosystem/export-profiles/) を参照してください。
 
-default publication profile は A4、40 字 × 30 行、上下 20 mm・左右 18 mm です。`pagination.gridMode` の default は `"strict"` で、printable area と grid から body size/line height を導出し、`fontSize`/`lineSpacing` を reject して grid が暗黙に変わるのを防ぎます。point size/line spacing を優先するなら `gridMode: "typographic"` を使います。これは sizing contract であり、heading、強制 break、font、reader layout まで含めて全 page が厳密に 40×30 glyph slot になるという保証ではありません。
+設定付き export は必ず `layout.system` を指定します。`"japanese-publisher"` は mirrored の和文 book 用で、横書きは 10 pt 明朝体の `Shirokuban`・左綴じ 27 字 × 26 行 strict grid、縦書きは A4 landscape の小説原稿・右綴じ 40 字 × 30 行 strict grid が default です。`"word"` は Word 形式の flowing page 用で、default は A4、四辺 25.4 mm、mirror なし、`gridMode: "typographic"` です。`"word"` は `"strict"` を reject します。
 
 ## 設定の所有者と DOCX の限界
 

@@ -45,6 +45,7 @@ describe("renderHtmlToPdf", () =>
 
 describe("PDF page-number layout", () => {
   const profile = (format: "simple" | "dash" | "fraction", position: "top-left" | "bottom-right") => ({
+    layout: { system: "japanese-publisher" as const, marginMode: "single" as const, bindingSide: "left" as const, gutter: 0 },
     metadata: {},
     typesetting: { writingMode: "horizontal" as const, fontFamily: "serif", textIndentEm: 1, fullwidthSpaceIndent: false },
     pagination: {
@@ -73,13 +74,15 @@ describe("PDF page-number layout", () => {
 });
 
 describe("PDF export profile", () => {
-  it("uses a readable A4 portrait baseline for horizontal documents", () => {
+  it("uses the researched four-six horizontal publisher baseline", () => {
     const html = applyPdfProfile(
       "<html><head></head><body><p>本文</p></body></html>",
       resolveExportProfile()
     );
-    expect(html).toContain("@page{size:210mm 297mm");
-    expect(html).toContain("@page{size:210mm 297mm;margin:20mm 18mm 20mm 18mm}");
+    expect(html).toContain("@page{size:127mm 188mm");
+    expect(html).toContain("@page{size:127mm 188mm;margin:16.5mm 15.5mm 18mm 18mm}");
+    expect(html).toContain("@page :right{margin:16.5mm 18mm 18mm 15.5mm}");
+    expect(html).toContain("@page :left{margin:16.5mm 15.5mm 18mm 18mm}");
     expect(html).not.toContain("body{padding:");
     expect(html).toContain("html{writing-mode:horizontal-tb!important");
     expect(html).not.toContain("p+h1,p+h2,p+h3,p+h4,p+h5,p+h6{padding-top:.75em}");
@@ -89,7 +92,7 @@ describe("PDF export profile", () => {
       "<html><head></head><body><p>first</p><div class=\"mdi-pagebreak\"></div><p>second</p></body></html>",
       resolveExportProfile()
     );
-    expect(html).toContain("@page{size:210mm 297mm;margin:20mm 18mm 20mm 18mm}");
+    expect(html).toContain("@page{size:127mm 188mm;margin:16.5mm 15.5mm 18mm 18mm}");
     expect(html).toContain("mdi-pagebreak");
     expect(html).not.toContain("padding:20mm");
   });
@@ -97,6 +100,7 @@ describe("PDF export profile", () => {
     const html = applyPdfProfile(
       "<html><head></head><body><p>本文</p></body></html>",
       {
+        layout: { system: "japanese-publisher", marginMode: "mirror", bindingSide: "right", gutter: 0 },
         metadata: {},
         typesetting: {
           writingMode: "vertical",
@@ -131,17 +135,44 @@ describe("PDF export profile", () => {
       "<html><head></head><body><p>本文</p></body></html>",
       resolveExportProfile()
     );
-    // Printable height is 257 mm; strict 30 lines use a fixed 8.566… mm pitch.
     expect(html).toContain("--mdi-grid-mode:strict");
-    expect(html).toContain("--mdi-characters-per-line:40");
-    expect(html).toContain("--mdi-lines-per-page:30");
-    expect(html).toMatch(/line-height:8\.566(?:6+)?mm/);
+    expect(html).toContain("--mdi-characters-per-line:27");
+    expect(html).toContain("--mdi-lines-per-page:26");
+    expect(html).toMatch(/line-height:5\.903846153846154mm/);
     expect(html).toContain("p{margin:0;text-indent:1em}");
+  });
+  it("uses the resolved inline pitch for a right-bound vertical manuscript", () => {
+    const html = applyPdfProfile(
+      "<html><head></head><body><p>本文</p></body></html>",
+      resolveExportProfile({
+        layout: { system: "japanese-publisher" },
+        typesetting: { writingMode: "vertical" },
+      })
+    );
+    expect(html).toContain("writing-mode:vertical-rl");
+    expect(html).toContain("@page{size:297mm 210mm");
+    expect(html).toMatch(/--mdi-character-pitch:3\.70416666666666\d*mm/);
+    expect(html).toContain("letter-spacing:0mm");
+  });
+  it("supports landscape typographic composition without an explicit leading multiplier", () => {
+    const html = applyPdfProfile(
+      "<html><head></head><body><p>本文</p></body></html>",
+      resolveExportProfile({
+        layout: { system: "japanese-publisher" },
+        typesetting: { fullwidthSpaceIndent: true, textIndentEm: 2 },
+        pagination: { pageSize: "A4", landscape: true, gridMode: "typographic" },
+      })
+    );
+    expect(html).toContain("@page{size:297mm 210mm");
+    expect(html).toContain("writing-mode:horizontal-tb");
+    expect(html).toContain("<p>　　本文");
+    expect(html).toContain("p{margin:0 0 .75em;text-indent:0}");
   });
   it("uses explicit point size and line spacing only in typographic mode", () => {
     const html = applyPdfProfile(
       "<html><head></head><body><p>本文</p></body></html>",
       resolveExportProfile({
+        layout: { system: "word" },
         typesetting: { fontSize: 12, lineSpacing: 1.5 },
         pagination: { gridMode: "typographic", charactersPerLine: 60, linesPerPage: 50 },
       })

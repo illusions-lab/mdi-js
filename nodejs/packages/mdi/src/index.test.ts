@@ -146,6 +146,7 @@ describe("Rust MDI JavaScript binding", () => {
 	it("publishes a configured EPUB with metadata, cover, chapters, and vertical type", async () => {
 		const epub = await renderEpubWithProfile("# First\n\nbody\n\n# Second\n\nmore", {
 			profile: {
+				layout: { system: "japanese-publisher" },
 				metadata: { title: "Configured book", author: "MDI", identifier: "test:configured" },
 				typesetting: { writingMode: "vertical", fontFamily: "Noto Serif JP", textIndentEm: 2 },
 				epub: { chapterSplitLevel: "h1" },
@@ -167,6 +168,7 @@ describe("Rust MDI JavaScript binding", () => {
 
 	it("offers configured EPUB through the renderEpub overload", async () => {
 		const epub = await renderEpub("# chapter", {
+			profile: { layout: { system: "japanese-publisher" } },
 			title: "Ergonomic book",
 			verticalWriting: true,
 			fontFamily: "Noto Serif JP",
@@ -185,6 +187,7 @@ describe("Rust MDI JavaScript binding", () => {
 		const source = "# Chapter\n\nbody";
 		const result = await renderEpubWithDiagnostics(source, {
 			title: "Typeset EPUB",
+			profile: { layout: { system: "word" } },
 		fontSize: 13,
 		lineSpacing: 1.6,
 		gridMode: "typographic",
@@ -203,6 +206,7 @@ describe("Rust MDI JavaScript binding", () => {
 
 	it("publishes a configured DOCX with vertical layout, geometry, margins, and page numbering", async () => {
 		const docx = await renderDocxWithProfile("{東京|とうきょう} ^12^", {
+			layout: { system: "japanese-publisher" },
 			metadata: { title: "Layout book", author: "MDI" },
 			typesetting: { writingMode: "vertical", fontFamily: "Noto Serif JP" },
 			pagination: {
@@ -216,9 +220,9 @@ describe("Rust MDI JavaScript binding", () => {
 		const header = await zip.file("word/header1.xml")!.async("string");
 
 		expect(document).toContain('w:textDirection w:val="tbRl"');
-		// Word rotates vertical sections so the A5 physical dimensions are swapped.
-		expect(document).toContain('w:w="11906"');
-		expect(document).toContain('w:h="8391"');
+		// A5 portrait remains physically portrait; Word applies vertical text direction.
+		expect(document).toContain('w:w="8391"');
+		expect(document).toContain('w:h="11906"');
 		expect(document).toContain('w:top="567" w:right="737" w:bottom="624" w:left="680"');
 		expect(document).toContain("<w:ruby ");
 		expect(document).toContain("<w:eastAsianLayout");
@@ -229,6 +233,7 @@ describe("Rust MDI JavaScript binding", () => {
 	it("normalizes ergonomic DOCX layout options without mutating the caller profile", async () => {
 		const options = {
 			title: "Ergonomic DOCX",
+			layout: { system: "word" as const },
 			verticalWriting: true,
 			fontFamily: "Noto Serif JP",
 		fontSize: 12,
@@ -254,6 +259,7 @@ describe("Rust MDI JavaScript binding", () => {
 	it("maps DOCX grid and full-width indentation aliases with diagnostics", async () => {
 		const result = await renderDocxWithDiagnostics("body", {
 			title: "Grid book",
+			layout: { system: "japanese-publisher" },
 			charactersPerLine: 32,
 			linesPerPage: 28,
 			textIndent: 2,
@@ -271,6 +277,7 @@ describe("Rust MDI JavaScript binding", () => {
 		await expect(renderEpubWithProfile("text", {
 			cover: { data: "not-bytes" as never, mediaType: "image/png" },
 		})).rejects.toThrow("options.cover.data must be a Uint8Array");
+		await expect(renderDocxWithProfile("text", {})).rejects.toThrow("Configured exports require layout.system");
 	});
 
 	it("converts the complete Rust IR structurally for publication adapters", () => {

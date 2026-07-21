@@ -11,7 +11,7 @@
     "dev": "pnpm --filter docs dev",
     "docs:dev": "pnpm --filter docs dev",
     "docs:build": "pnpm run build && pnpm --filter docs build",
-    "build": "turbo run build",
+    "build": "node scripts/verify-publication-layouts.mjs && turbo run build",
     "test": "turbo run test",
     "test:coverage": "node nodejs/scripts/check-node-coverage.mjs",
     "typecheck": "turbo run typecheck",

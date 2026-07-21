@@ -16,31 +16,44 @@ npm install @illusions-lab/mdi-export-profile
 import { parseExportProfileJson, resolveExportProfile } from "@illusions-lab/mdi-export-profile";
 
 const profile = resolveExportProfile({
+	layout: { system: "japanese-publisher" },
   metadata: { title: "A short work", language: "ja" },
   typesetting: {
     writingMode: "vertical",
     fontFamily: "Noto Serif JP",
-    // Point sizes belong to typographic mode; strict is the default manuscript grid.
+    // Explicit line spacing belongs to typographic mode; strict keeps grid cells.
     fontSize: 11,
     lineSpacing: 1.5,
   },
   pagination: { gridMode: "typographic" },
 });
 
-const fromFile = parseExportProfileJson('{"pagination":{"pageSize":"A5"}}');
+const fromFile = parseExportProfileJson(
+  '{"layout":{"system":"word"},"pagination":{"pageSize":"A5"}}'
+);
 ```
 
 Use the resolved profile with the JavaScript PDF/mdast adapters or pass a JSON
 profile to `mdi build --config export.json`. Rust remains responsible for MDI
 syntax and document semantics.
 
-The default is a strict publisher manuscript grid: A4, 40 characters × 30
-lines, with 20 mm top/bottom and 18 mm left/right margins. In
-`pagination.gridMode: "strict"`, `charactersPerLine` and `linesPerPage` are
-the physical page contract; supplying `fontSize` or `lineSpacing` is rejected
-so no renderer can silently change the promised count. Set
-`pagination.gridMode: "typographic"` only when a point size and a CSS/Word
-line-spacing multiplier deliberately take priority instead.
+Configured exports must select `layout.system`. The two systems deliberately
+do not blend:
+
+- `japanese-publisher` is a strict manuscript grid. Horizontal text uses the
+  four-six (`Shirokuban`) 10 pt Mincho 27 × 26 left-bound book default.
+  Vertical text uses the A4-landscape, 10.5 pt Mincho 40 × 30 right-bound
+  novel-manuscript default, with a 28 mm right binding margin. Both use
+  mirrored pages.
+- `word` is a flowing Word-style document: A4 by default, 25.4 mm margins on
+  all four edges, and no mirrored book gutter. It always uses
+  `gridMode: "typographic"`; a strict character grid is rejected.
+
+Other declared paper sizes derive safe values from the selected system. In a
+strict grid, `lineSpacing` is rejected; in typographic mode it is the
+renderer-owned baseline multiplier. Contest or house formats such as A4
+40 × 30 belong in a separate application/preset layer, not in this generic
+schema or the MDI parser.
 
 The strict character count is a full-width CJK manuscript grid. It fixes the
 printable inline extent, body cell pitch, and line pitch in DOCX/PDF; it does
@@ -53,6 +66,6 @@ reading existing JSON, but new profiles should use `fontSize` and
 
 ## Documentation
 
-- [Export-profile guide](https://mdi.illusions.app/guides/export-profiles/)
+- [Export-profile guide](https://mdi.illusions.app/ecosystem/export-profiles/)
 - [API reference](https://mdi.illusions.app/api/export-profile/)
 - [JavaScript documentation](https://mdi.illusions.app/bindings/javascript/)

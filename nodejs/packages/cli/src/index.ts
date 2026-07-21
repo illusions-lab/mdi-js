@@ -7,12 +7,11 @@ import {
   type ExportProfile,
 } from "@illusions-lab/mdi-export-profile";
 import {
-  renderDocx,
   renderDocxWithProfile,
-  renderEpub,
   renderEpubWithProfile,
   renderHtml,
   renderTextFormat,
+  parse,
   type EpubCover,
 } from "@illusions-lab/mdi";
 
@@ -58,6 +57,8 @@ export async function build(
   const resolvedOptions =
     typeof options === "string" ? { output: options } : options;
   const source = await readFile(input, "utf8");
+  const publicationProfile =
+    resolvedOptions.profile ?? defaultCliPublicationProfile(source);
   if (format === "txt-all") {
     if (resolvedOptions.output)
       throw new Error("--to txt-all does not accept -o; it writes all text formats next to the input file");
@@ -86,18 +87,14 @@ export async function build(
     format === "pdf"
       ? await (
           await import("@illusions-lab/mdi-to-pdf")
-        ).renderHtmlToPdf(renderHtml(source), resolvedOptions.profile)
+        ).renderHtmlToPdf(renderHtml(source), publicationProfile)
       : format === "epub"
-      ? resolvedOptions.profile
-        ? await renderEpubWithProfile(source, {
-            profile: resolvedOptions.profile,
-            cover: await loadEpubCover(resolvedOptions.profile),
-          })
-        : renderEpub(source)
+      ? await renderEpubWithProfile(source, {
+          profile: publicationProfile,
+          cover: await loadEpubCover(publicationProfile),
+        })
       : format === "docx"
-      ? resolvedOptions.profile
-        ? await renderDocxWithProfile(source, resolvedOptions.profile)
-        : renderDocx(source)
+      ? await renderDocxWithProfile(source, publicationProfile)
       : "";
   const extension = format;
   const destination =
@@ -105,6 +102,19 @@ export async function build(
     defaultOutputPath(input, format, extension);
   await writeFile(destination, result);
   return resolve(destination);
+}
+
+/** CLI publication defaults: Japanese A4 manuscript for vertical, Word A4 for horizontal. */
+function defaultCliPublicationProfile(source: string): ExportProfile {
+  const writingMode = parse(source).document.frontmatter?.entries.find(
+    (entry) => entry.key === "writing-mode" || entry.key === "writingMode",
+  )?.value === "vertical" ? "vertical" : "horizontal";
+  return {
+    layout: {
+      system: writingMode === "vertical" ? "japanese-publisher" : "word",
+    },
+    typesetting: { writingMode },
+  };
 }
 
 function rustTextOutput(source: string, profile: ExportProfile | undefined, format: TextOutputFormat): string {

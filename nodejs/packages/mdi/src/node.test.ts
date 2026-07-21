@@ -17,11 +17,11 @@ describe("@illusions-lab/mdi/node PDF boundary", () => {
 	it("prepares Rust-owned HTML and preserves front-matter writing mode", () => {
 		const request = preparePdfExport(
 			"---\nwriting-mode: vertical\n---\n# 題\n\n{東京|とうきょう}",
-			{ pagination: { pageSize: "A5" } },
+			{ layout: { system: "japanese-publisher" }, pagination: { pageSize: "A5" } },
 		);
 
 		expect(request.sourceWritingMode).toBe("vertical");
-		expect(request.profile).toEqual({ pagination: { pageSize: "A5" } });
+		expect(request.profile).toEqual({ layout: { system: "japanese-publisher" }, pagination: { pageSize: "A5" } });
 		expect(request.html).toContain("<!DOCTYPE html>");
 		expect(request.html).toContain('<ruby class="mdi-ruby">東京');
 	});
@@ -29,7 +29,7 @@ describe("@illusions-lab/mdi/node PDF boundary", () => {
 	it("hands explicit HTML/profile data to an Electron-compatible adapter", async () => {
 		const renderHtmlToPdf = vi.fn(async () => new Uint8Array([0x25, 0x50, 0x44, 0x46]));
 		const adapter: MdiPdfChromiumAdapter = { renderHtmlToPdf };
-		const profile = { typesetting: { writingMode: "horizontal" as const } };
+		const profile = { layout: { system: "word" as const }, typesetting: { writingMode: "horizontal" as const } };
 
 		await expect(renderPdfWithChromium("text", profile, adapter)).resolves.toEqual(
 			new Uint8Array([0x25, 0x50, 0x44, 0x46]),
@@ -40,7 +40,7 @@ describe("@illusions-lab/mdi/node PDF boundary", () => {
 	});
 
 	it("retains diagnostics, source spans, and headings at the PDF boundary", async () => {
-		const profile = { pagination: { pageSize: "A5" as const } };
+		const profile = { layout: { system: "japanese-publisher" as const }, pagination: { pageSize: "A5" as const } };
 		const prepared = preparePdfExportWithDiagnostics("# {東京|とうきょう}\n\ntext", profile);
 		expect(prepared.output.profile).toBe(profile);
 		expect(prepared.output.sourceWritingMode).toBeUndefined();
@@ -70,6 +70,8 @@ describe("@illusions-lab/mdi/node PDF boundary", () => {
 
 	it("rejects invalid source before loading a browser adapter", () => {
 		expect(() => preparePdfExport(null as never)).toThrow("source must be a string");
+		expect(() => preparePdfExport("text", { pagination: { pageSize: "A4" } }))
+			.toThrow("Configured exports require layout.system");
 	});
 
 	it("loads the optional default Chromium adapter only for the Node entry point", async () => {
