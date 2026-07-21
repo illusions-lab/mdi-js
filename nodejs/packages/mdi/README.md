@@ -62,14 +62,73 @@ unsupported version.
 
 ## Rendering
 
-Rendering starts from the same Rust IR. Canonical MDI, plain text, HTML, EPUB,
-and DOCX renderers execute in Rust and are exposed through this package. PDF
-uses Rust HTML as its input to a host layout adapter such as
+Rendering starts from the same Rust IR. Canonical MDI, plain text, HTML, and
+the one-argument baseline EPUB/DOCX renderers execute in Rust and are exposed
+through this package. PDF uses Rust HTML as its input to a host layout adapter such as
 `@illusions-lab/mdi-to-pdf`; the adapter may control Chromium, but it never
 parses MDI or produces semantic HTML.
 
 Browser WebAssembly cannot start Chromium. Browser code sends Rust-rendered
 HTML to a server or desktop host when it needs PDF output.
+
+### HTML, diagnostics, and host workflows
+
+`renderHtml(source)` returns a standalone HTML document with the stable MDI
+classes emitted by Rust. Pass `{ bodyOnly: true }` to embed its semantic body
+in an application shell; this changes only the outer document wrapper, never
+the MDI-to-HTML semantics.
+
+```ts
+import { renderHtmlWithDiagnostics } from "@illusions-lab/mdi";
+
+const result = renderHtmlWithDiagnostics(source, { bodyOnly: true });
+preview.replaceChildren(htmlToDom(result.output));
+showDiagnostics(result.diagnostics); // stable codes and UTF-8 source spans
+buildOutline(result.headings);       // source-backed heading nodes, not HTML scraping
+```
+
+For a parse-first flow, call `prepareRender(source)` (or `parse(source)`) and
+display `diagnostics` before choosing an exporter. The public Rust ABI accepts
+source text for renderer calls today, so renderers re-enter the same
+Rust-authoritative parser rather than accepting mutable JavaScript IR. This
+keeps the source spans and error codes predictable and prevents JavaScript from
+becoming a second syntax implementation.
+
+Configuration ownership is deliberately split: Rust owns MDI parsing and
+semantic HTML; publication profiles own EPUB/DOCX metadata and typesetting;
+the host owns Chromium/Electron, paper-printer integration, and application UI
+preferences. This keeps platform-specific pagination controls out of the
+parser and lets Electron supply its own PDF adapter.
+
+### Configured EPUB and DOCX
+
+For publication output, pass an export profile to the overloads (or use the
+explicit `WithProfile` functions). These Node.js-only async paths map the
+Rust-owned IR through the publication adapters and retain configuration for
+metadata, chapter splitting, vertical writing, font selection, paper size,
+margins, and page numbers. EPUB also accepts in-memory PNG or JPEG cover art.
+
+```ts
+import { renderDocxWithProfile, renderEpubWithProfile } from "@illusions-lab/mdi";
+
+const epub = await renderEpubWithProfile(source, {
+  profile: {
+    metadata: { title: "Book", author: "Author" },
+    typesetting: { writingMode: "vertical", fontFamily: "Noto Serif JP" },
+    epub: { chapterSplitLevel: "h1" },
+  },
+  cover: { data: coverBytes, mediaType: "image/png" },
+});
+
+const docx = await renderDocxWithProfile(source, {
+  pagination: { pageSize: "A5", margins: { top: 12, bottom: 12, left: 14, right: 14 } },
+});
+```
+
+`renderEpub(source)` and `renderDocx(source)` remain synchronous,
+backward-compatible Rust baseline exports. `renderEpub(source, options)` and
+`renderDocx(source, profile)` are equivalent async overloads for configured
+publication output.
 
 ## Remark compatibility
 

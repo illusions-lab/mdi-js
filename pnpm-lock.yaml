@@ -130,7 +130,25 @@ importers:
       '@illusions-lab/mdi-core':
         specifier: workspace:*
         version: link:../mdi-core
+      '@illusions-lab/mdi-export-profile':
+        specifier: workspace:*
+        version: link:../export-profile
+      '@illusions-lab/mdi-to-docx':
+        specifier: workspace:*
+        version: link:../to-docx
+      '@illusions-lab/mdi-to-epub':
+        specifier: workspace:*
+        version: link:../to-epub
+      '@types/mdast':
+        specifier: ^4.0.0
+        version: 4.0.4
+      yaml:
+        specifier: ^2.0.0
+        version: 2.9.0
     devDependencies:
+      jszip:
+        specifier: ^3.10.0
+        version: 3.10.1
       tsup:
         specifier: ^8.3.0
         version: 8.5.1(postcss@8.5.19)(typescript@5.9.3)(yaml@2.9.0)
@@ -198,9 +216,6 @@ importers:
         specifier: workspace:*
         version: link:../mdast-util-mdi
     devDependencies:
-      '@illusions-lab/mdi-remark':
-        specifier: workspace:*
-        version: link:../remark
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.43
@@ -244,9 +259,6 @@ importers:
         specifier: ^3.10.0
         version: 3.10.1
     devDependencies:
-      '@illusions-lab/mdi-remark':
-        specifier: workspace:*
-        version: link:../remark
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.43
@@ -268,9 +280,6 @@ importers:
 
   nodejs/packages/to-hast:
     dependencies:
-      '@illusions-lab/mdi-remark':
-        specifier: workspace:*
-        version: link:../remark
       mdast-util-mdi:
         specifier: workspace:*
         version: link:../mdast-util-mdi

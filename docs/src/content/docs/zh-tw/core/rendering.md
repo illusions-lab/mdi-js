@@ -1,62 +1,44 @@
 ---
 title: 轉譯模型與 Chromium/PDF 邊界
-description: 同一份 IR 如何成為 HTML、TXT、EPUB、DOCX 與 PDF，以及 Chromium 工作的精確邊界。
+description: Rust-owned MDI 語意如何流向 baseline export、可設定 publication adapter 與 PDF host。
 ---
 
-**先備知識：**[Document IR](/zh-tw/core/document-ir/)。
+**先備知識：**[Document IR](/zh-tw/core/document-ir/)、[export profiles](/zh-tw/ecosystem/export-profiles/)。
 
-每個 renderer 的輸入都是同一份 parsed `Document`（或內部自行 parse 的 raw source），絕不重新解析 source text 或重建 MDI boundaries。本頁談輸出；tree 內容請見 [Document IR](/zh-tw/core/document-ir/)。
+## 一份語意、兩層設定
 
-| 輸出 | 產生者 | 角色 |
+Rust 擁有 `.mdi` parse、diagnostic code、UTF-8 span，以及 semantic HTML/baseline EPUB/DOCX/TXT。它是 ruby、tate-chu-yoko、不換行、kern、blank paragraph、pagebreak 等 MDI 意義的唯一 authority。
+
+EPUB/DOCX adapter 對已 parse 的 Rust IR 套用 metadata、chapter、typography、page setup、numbering。Chromium path 與 app UI preference 是 host 設定。這樣不把 platform-specific print policy 塞入 parser。
+
+設定型 publication export 必須明示 `layout.system`。`japanese-publisher` 是 strict 的日文書籍契約：橫書為 `Shirokuban`、10 pt 明朝體、鏡像頁、左裝訂 27×26；直書為 A4 landscape 小說原稿、鏡像頁、右裝訂 40×30。`word` 刻意採不相容的契約：A4、四邊 25.4 mm、無鏡像、流動 `typographic` layout，且拒絕 `strict`。
+
+| 輸出 | baseline | 可設定 route |
 | --- | --- | --- |
-| HTML | `render_html` / `renderHtml` | Semantic document 與 `.mdi-*` stylesheet |
-| TXT（5 種） | `render_text_format` / `renderTextFormat` | 純文字、保留 ruby 或特定投稿平台慣例 |
-| EPUB | `render_epub` / `renderEpub` | 可重排 XHTML chapters、`nav.xhtml`、CSS 與 OPF package，打包為 zip |
-| DOCX | `render_docx` / `renderDocx` | OOXML（WordprocessingML）文件，打包為 zip |
-| PDF | `render_pdf` /（CLI `--to pdf`） | Rust 產生 HTML/print CSS，再由本機 Chromium layout |
+| HTML | `renderHtml(source)` | `{ bodyOnly: true }` 或附 diagnostics/headings 的 `renderHtmlWithDiagnostics`。 |
+| TXT | `renderTextFormat` | caller 傳入 indent。 |
+| EPUB | `renderEpub(source)` | `await renderEpub(source, { profile, cover })`。 |
+| DOCX | `renderDocx(source)` | `await renderDocx(source, profile)`。 |
+| PDF | — | `@illusions-lab/mdi/node` 將 Rust HTML 與 profile 交給 Chromium-capable host。 |
 
-## HTML
+## diagnostics 與 HTML
 
-`renderHtml(source)` 回傳**完整 standalone document**，從 `<!DOCTYPE html>` 到 `</html>`，含 embedded `<style>`。`lang`、`<title>` 及僅在 `writing-mode: vertical` 時的 `<html>` `writing-mode: vertical-rl` style 都直接取自 front matter。
+匯出 UI 先呼叫 `parse(source)`/`prepareRender(source)`。`document` 保留 span，`diagnostics` 保留 warning。`renderHtmlWithDiagnostics` 另回傳 HTML 與 headings。Rust ABI 尚不能讓 renderer 接受 serialized IR handle，因此 helper 依序以同一份 source validate/render，而不創造第二個 parser。
 
-## TXT（五種）
+`renderHtml` 回傳有 stylesheet 的完整 page；`bodyOnly` 回傳供 app shell 使用的 body contents。ruby 使用 `<ruby>`/`<rt>`/`<rp>`，MDI extension 有可預期的 `mdi-*` class。
 
-`renderTextFormat(source, format, indentPrefix)` 的 `format` 為 `txt`、`txt-ruby`、`narou`、`kakuyomu` 或 `aozora`。每個 construct 的映射見[完整 syntax reference：TXT export flavors](/zh-tw/syntax/reference/#txt-匯出風格)。`indentPrefix` 是 caller 指定、加到每段前的字串（通常來自 [export profile](/zh-tw/ecosystem/export-profiles/) 的全形空白）；Rust 不替使用者決定縮排政策。
+## EPUB/DOCX
 
-## EPUB 與 DOCX：baseline 的具體含義
+單一參數的 synchronous call 是 Rust baseline export。可設定 call 為 async，會把 Rust IR 結構轉換至 Node adapter，JavaScript 不會重新 parse MDI source。EPUB 接受 metadata、直排、font、indent、chapter level、JPEG/PNG cover；DOCX 接受 metadata、page size/orientation/margin、font/size/line spacing/indent、page number。
 
-`renderEpub`/`renderDocx` 不使用外部工具：Rust 自行寫入 ZIP container、XHTML/OOXML markup 與 CSS。
-
-- **EPUB** 會在每個 `<h1>` 與每個 `[[pagebreak]]` 分章；metadata（`title`、`author`、`lang`、`identifier`）來自 front matter，缺省為 `Untitled`/`urn:mdi:document`。`writing-mode: vertical` 在 OPF spine 設 `page-progression-direction="rtl"`，並在 body 設 vertical CSS。
-- **DOCX** 目前是純文字段落；ruby、boten 等 MDI typography 會 flatten 成 base text，與 `render_text` 相同。`[[pagebreak]]` 產生原生 OOXML `<w:br w:type="page"/>`。尚無 ruby run、boten character style 或 page geometry；請見 [Rust Core API](/zh-tw/core/rust-api/#尚未實作)。
-- 兩者尚未消費 [export profile](/zh-tw/ecosystem/export-profiles/) 的 cover、chapter-split level 或 page geometry；這些是**待加入的 Rust API options**。CLI 的 `--config` 現只送到 PDF 與 text renderer。
+DOCX 將 pagebreak、書寫方向、paragraph 與可用 inline/run formatting map 到 OOXML。ruby、tate-chu-yoko、禁則/不換行、kern、強制 blank 的結果是 OOXML approximation，不是 browser-identical。重要組版請在實際 reader 驗證。
 
 ## Chromium/PDF 邊界
 
-唯一會啟動 native process 的地方，分工如下：
+`@illusions-lab/mdi/node` 的 `preparePdfExport(source, profile)` 回傳 Rust HTML、profile 與 front matter writing direction；Electron 可在自己的 BrowserWindow print。`renderPdfWithChromium` 會 load 另外安裝的 `@illusions-lab/mdi-to-pdf` (Playwright)，或使用 Electron-compatible `{ renderHtmlToPdf }` adapter。
 
-1. Rust 產生與 `renderHtml` 相同的 HTML。
-2. Rust 寫入 temporary file，再透過 `render_pdf(source, options)` 要求**本機已安裝的 Chromium-family browser** headless 開啟並呼叫 `printToPDF`：
+PDF adapter 套用紙張、橫向、邊距、直/橫排、font/size/line spacing、每行字數/每頁行數、indent、page number。browser WASM 不能 spawn Chromium，須把 request 交給 Node/Electron/Tauri/CLI host。Chromium 收到的是完成 HTML/CSS，從不接觸 `.mdi`。
 
-```rust
-pub struct PdfOptions { pub chromium_path: Option<PathBuf>, }
-```
-
-```bash
-chromium --headless=new --disable-gpu --no-pdf-header-footer \
-  --print-to-pdf=document.pdf file://document.html
-```
-
-3. 未指定 `chromium_path` 時，`find_chromium()` 只搜尋固定常見位置：macOS `/Applications/...` 的 Google Chrome/Chromium，或 Linux `/usr/bin` 的 `google-chrome`/`chromium`/`chromium-browser`。找不到時回傳 `"Chromium executable not found; set PdfOptions.chromium_path"`；production 應明確傳 path。
-
-**Chromium 永遠不會收到 `.mdi` source，也不決定何者是 MDI syntax。**它只收到完成的 HTML/CSS，執行 browser print dialog 同類工作：pagination、font shaping、vertical-writing layout、ruby positioning 與 rasterizing 成 PDF stream。若 PDF 的 ruby/tate-chu-yoko 語意錯誤，bug 必在 Rust HTML generation，絕非 Chromium。
-
-### 為何 browser WebAssembly 無法做此步驟
-
-在 browser tab 的 WASM 不能啟動另一個 OS process。解析與非 PDF renderer 可在其中運作，但 PDF 需要能 spawn Chromium 的 host：Node.js server、desktop app（Electron/Tauri 等）或 CLI。browser app 若需 PDF，必須呼叫這類 host。
-
-## 下一步
-
-- [Rust Core API 狀態](/zh-tw/core/rust-api/)
-- [CLI 綁定](/zh-tw/bindings/cli/)
-- [輸出格式](/zh-tw/ecosystem/outputs/)
+- [JavaScript / TypeScript](/zh-tw/bindings/javascript/)
+- [CLI](/zh-tw/bindings/cli/)
+- [Diagnostics](/zh-tw/core/diagnostics/)

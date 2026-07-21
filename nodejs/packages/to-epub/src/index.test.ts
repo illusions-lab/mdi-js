@@ -1,24 +1,24 @@
 import JSZip from "jszip";
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
-import { unified } from "unified";
-import remarkParse from "remark-parse";
-import remarkMdi from "@illusions-lab/mdi-remark";
 import type { Root } from "mdast";
 import { mdiToEpub } from "./index.js";
 
+const require = createRequire(import.meta.url);
+const { parse: parseMdi, toPublicationMdast } = require("../../mdi/dist/index.cjs") as {
+  parse(source: string): { document: unknown };
+  toPublicationMdast(document: unknown): Root;
+};
+
 function parse(source: string): Root {
-  const p = unified().use(remarkParse).use(remarkMdi);
-  return p.runSync(p.parse(source)) as Root;
+  return toPublicationMdast(parseMdi(source).document);
 }
 
 describe("mdiToEpub", () =>
   it("packages pagebreak segments as EPUB spine chapters", async () => {
-    const p = unified().use(remarkParse).use(remarkMdi);
     const zip = await JSZip.loadAsync(
       await mdiToEpub(
-        p.runSync(
-          p.parse("---\ntitle: Test\n---\none\n\n[[pagebreak]]\n\ntwo")
-        ) as Root
+        parse("---\ntitle: Test\n---\none\n\n[[pagebreak]]\n\ntwo")
       )
     );
     expect(await zip.file("mimetype")!.async("string")).toBe(
@@ -120,7 +120,9 @@ describe("mdiToEpub edge cases", () => {
           typesetting: {
             writingMode: "vertical",
             fontFamily: "Noto Serif JP",
+            fontSize: 11,
             textIndentEm: 2,
+            fullwidthSpaceIndent: true,
           },
           epub: { chapterSplitLevel: "h1" },
         },
@@ -140,7 +142,9 @@ describe("mdiToEpub edge cases", () => {
         .length
     ).toBe(2);
     expect(css).toContain("font-family:Noto Serif JP");
+    expect(css).toContain("font-size:11pt");
     expect(css).toContain("text-indent:2em");
+    expect(css).toContain("--mdi-fullwidth-space-indent:1");
     expect(css).toContain("writing-mode:vertical-rl");
 	});
 

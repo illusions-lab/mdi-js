@@ -1,68 +1,84 @@
 ---
 title: JavaScript / TypeScript
-description: Rust-backed JavaScript API @illusions-lab/mdi。
+description: Rust が決めた MDI の意味を JavaScript から使い、baseline と設定付き export を選ぶ方法。
 ---
 
 **前提:** [Getting Started](/ja/guides/getting-started/)、[Document IR](/ja/core/document-ir/)。
 
-## この binding で解決すること
-
-`@illusions-lab/mdi` は `mdi-core` を WebAssembly に compile した binding です。Node.js、bundler を使う Web app、その他の JavaScript/TypeScript 環境から CLI を起動せずに `.mdi` を解析・描画できます。JavaScript 側に MDI grammar の再実装はありません。
-
-## Install
+## Install と parse-first
 
 ```bash
 npm install @illusions-lab/mdi
 ```
 
-Node.js および WASM import を扱える bundler（Vite、Webpack 5+、WASM loader を持つ esbuild）で動き、WASM binary は package に同梱されます。利用側マシンで native build は不要です。
-
-## 最小例
+この package は `mdi-core` を prebuilt WASM として実行します。Node.js と WASM import 対応 bundler で動き、利用側で native build は不要です。editor/export UI ではまず `parse()` して warning と span を表示します。
 
 ```ts
-import { parse, renderHtml } from "@illusions-lab/mdi";
-const source = "第^12^話。{東京|とうきょう}は雨だった。";
-const result = parse(source);
-console.log(result.syntaxVersion, result.irVersion); // "2.0" "1.0"
-console.log(result.document.children.length);        // 1（paragraph 一つ）
-console.log(result.diagnostics);                     // []
-console.log(renderHtml(source));
+import { parse, renderHtmlWithDiagnostics } from "@illusions-lab/mdi";
+
+const source = "# 第一章\n{東京|とうきょう}は雨だった。";
+const parsed = parse(source);
+if (parsed.diagnostics.some((item) => item.severity === "error")) {
+  // code と UTF-8 byte span を editor に表示する
+}
+const result = renderHtmlWithDiagnostics(source, { bodyOnly: true });
+console.log(result.output);   // <body> の semantic contents
+console.log(result.headings); // depth、text、span を持つ source-order headings
 ```
 
-## Export される全関数
+`parse` は Rust-owned `document`、`diagnostics`、UTF-8 byte span を返します。現時点で実装済み diagnostic code は `mdi.version.unsupported` だけです。構文の誤りの多くは throw ではなく literal fallback になります。`prepareRender(source)` も parse-first 用です。`*WithDiagnostics` は output と同じ parser result を返しますが、warning を error に変えるものではありません。
+
+`renderHtml(source)` は MDI stylesheet 付き standalone HTML を返します。app が外側の page を持つなら `{ bodyOnly: true }` を使います。semantic HTML は stable な `mdi-ruby`、`mdi-tcy`、`mdi-em`、`mdi-pagebreak` 等の class を付けます。
+
+## baseline と設定付き EPUB/DOCX
+
+一引数の API は synchronous Rust baseline export です。
 
 ```ts
-import { parse, renderHtml, renderText, renderTextFormat, renderEpub,
-  renderDocx, serializeMdi, parseMdiSyntax, MDI_SPEC_VERSION, MDI_IR_VERSION } from "@illusions-lab/mdi";
-type MdiTextFormat = "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora";
+import { renderEpub, renderDocx } from "@illusions-lab/mdi";
+await writeFile("book.epub", renderEpub(source));
+await writeFile("book.docx", renderDocx(source));
 ```
 
-すべて complete source string を受け、内部で full parse します。JavaScript level に「一度 parse して複数形式を render」する API はまだありません。複数の renderer を同じ大きな文書に使うと、それぞれ Rust の `parse_document` を呼ぶ現在の実コストがあります。
+publication 設定が必要なら二引数 overload（または `WithProfile`）を `await` します。これは Rust IR を EPUB/DOCX adapter に構造変換するため asynchronous ですが、JavaScript で MDI source を再 parse しません。
 
-## 入出力の型
+```ts
+const epub = await renderEpub(source, {
+  profile: { layout: { system: "japanese-publisher" } },
+  title: "雨の東京", author: "Illusions", language: "ja",
+  publisher: "Illusions Lab", identifier: "urn:isbn:example", date: "2026-07-21",
+  verticalWriting: true, fontFamily: "Yu Mincho", textIndent: 1,
+  chapterSplitLevel: "h1", coverImage: coverBytes, coverMediaType: "image/png",
+});
 
-`parse()` は `irVersion`、`syntaxVersion`、`capabilities`、`document`、`diagnostics` を持つ `MdiSyntaxParseResult` を返します。`document` と `diagnostics` の形は [Document IR](/ja/core/document-ir/) と [Diagnostics](/ja/core/diagnostics/) を参照してください。`renderEpub` と `renderDocx` は `Uint8Array` なので、Node.js では `fs.writeFile`、browser では `Blob` に渡してください。ほかはすべて `string` です。
+const docx = await renderDocx(source, {
+  layout: { system: "word" },
+  title: "雨の東京", author: "Illusions", verticalWriting: true,
+  fontFamily: "Yu Mincho", fontSize: 11, lineSpacing: 1.6, textIndent: 1,
+  pagination: { gridMode: "typographic" },
+  pageSize: "A5", landscape: false,
+  margins: { top: 18, right: 15, bottom: 18, left: 15 },
+  showPageNumbers: true, pageNumberPosition: "bottom-center", pageNumberFormat: "simple",
+});
+```
 
-## Diagnostic と error handling
+EPUB は metadata、縦書き、font、indent、`h1`/`h2`/`h3`/`none` chapter split、PNG/JPEG `Uint8Array` cover を扱います。DOCX は metadata、page size/orientation/margin、font/size/line spacing/indent、page number（`simple`/`dash`/`fraction`）を扱います。どちらも full nested `ExportProfile` も使えます。JSON の全 schema は [Export profiles](/ja/ecosystem/export-profiles/) を参照してください。
 
-`source` が string でない場合は `TypeError`、WASM と package の IR version が異なる場合は `Error` です。不正な MDI 記法自体は throw せず literal fallback になり、現在の diagnostic は [唯一の `mdi.version.unsupported`](/ja/core/diagnostics/) です。`try`/`catch` を diagnostics の代わりに使わないでください。
+設定付き export は必ず `layout.system` を指定します。`"japanese-publisher"` は mirrored の和文 book 用で、横書きは 10 pt 明朝体の `Shirokuban`・左綴じ 27 字 × 26 行 strict grid、縦書きは A4 landscape の小説原稿・右綴じ 40 字 × 30 行 strict grid が default です。`"word"` は Word 形式の flowing page 用で、default は A4、四辺 25.4 mm、mirror なし、`gridMode: "typographic"` です。`"word"` は `"strict"` を reject します。
 
-## IR version と UTF-8 byte span
+## 設定の所有者と DOCX の限界
 
-`MDI_IR_VERSION` は現在 `"1.0"` です。`parse()` は package に組み込まれた定数と WASM の `irVersion` が違えば throw し、version が食い違う WASM を黙って解釈しません。`document` のすべての span は JavaScript string index ではなく UTF-8 **byte** offset です。`<textarea>` の selection などに使う前に [Diagnostics](/ja/core/diagnostics/#span) のように明示的に変換してください。
+Rust が grammar、diagnostic、span、semantic HTML/baseline export を所有します。EPUB/DOCX の profile は publication adapter の責務であり、紙面、Chromium、application UI の選択は host の責務です。DOCX は page break、縦書き、paragraph/run を OOXML に落としますが、ruby、tate-chu-yoko、禁則/改行禁止、kern、強制 blank paragraph を browser HTML と pixel-identical に再現する約束ではありません。重要な組版は対象 Word-compatible reader で確認してください。
 
-## 現在の実装状況
+## HTML/PDF host
 
-列挙した関数はすべて実装済みです。EPUB/DOCX は baseline（export-profile の cover/chapter split は未対応）です。
+```ts
+import { preparePdfExport, renderPdfWithChromium } from "@illusions-lab/mdi/node";
 
-## この binding がしないこと
+const request = preparePdfExport(source, profile); // Electron の print API に渡せる
+const pdf = await renderPdfWithChromium(source, profile);
+```
 
-- **PDF はありません。** WASM は process を起動できないため、PDF には CLI または Node host の `@illusions-lab/mdi-to-pdf` を使います。
-- **独自 grammar はありません。** CLI や Rust と意味が食い違えば `mdi-core` のバグです。
-- **export profile を適用しません。** page size、font、margin はこの API の引数ではありません。`@illusions-lab/mdi-export-profile` と CLI の `--config` を使ってください。
+Node の default PDF adapter には別途 `npm install @illusions-lab/mdi-to-pdf` が必要です。Electron は `{ renderHtmlToPdf(html, profile, sourceWritingMode) }` adapter を渡せます。PDF profile は paper、landscape、margin、縦横、font、font size/line spacing、文字数/行数、indent、page number を扱います。browser/WASM は main entry point の baseline renderer を使えますが、設定付き publication adapter と PDF は Node/Electron host workflow です。`preparePdfExport()` を Node/Electron/Tauri/CLI host に送ります。
 
-## 次へ
-
-- [Rust Core API](/ja/core/rust-api/)
-- [Remark adapter](/ja/ecosystem/remark/)
-- [CLI](/ja/bindings/cli/)
+非 string source と不正 option は `TypeError` です。diagnostic は document feedback として扱い、I/O/archive/host renderer の failure だけを `try`/`catch` してください。span は JavaScript index ではなく UTF-8 **byte** offset です。

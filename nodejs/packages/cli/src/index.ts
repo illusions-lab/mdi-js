@@ -6,7 +6,14 @@ import {
   resolveExportProfile,
   type ExportProfile,
 } from "@illusions-lab/mdi-export-profile";
-import { renderDocx, renderEpub, renderHtml, renderTextFormat } from "@illusions-lab/mdi";
+import {
+  renderDocxWithProfile,
+  renderEpubWithProfile,
+  renderHtml,
+  renderTextFormat,
+  parse,
+  type EpubCover,
+} from "@illusions-lab/mdi";
 
 export const MDI_SPEC_VERSION = "2.0";
 export type OutputFormat =
@@ -50,6 +57,8 @@ export async function build(
   const resolvedOptions =
     typeof options === "string" ? { output: options } : options;
   const source = await readFile(input, "utf8");
+  const publicationProfile =
+    resolvedOptions.profile ?? defaultCliPublicationProfile(source);
   if (format === "txt-all") {
     if (resolvedOptions.output)
       throw new Error("--to txt-all does not accept -o; it writes all text formats next to the input file");
@@ -78,18 +87,36 @@ export async function build(
     format === "pdf"
       ? await (
           await import("@illusions-lab/mdi-to-pdf")
-        ).renderHtmlToPdf(renderHtml(source), resolvedOptions.profile)
+        ).renderHtmlToPdf(renderHtml(source), publicationProfile)
       : format === "epub"
-      ? renderEpub(source)
+      ? await renderEpubWithProfile(source, {
+          profile: publicationProfile,
+          cover: await loadEpubCover(publicationProfile),
+        })
       : format === "docx"
-      ? renderDocx(source)
-      : "";
+      ? await renderDocxWithProfile(source, publicationProfile)
+      : (() => {
+          throw new Error(`Unsupported output format: ${format}`);
+        })();
   const extension = format;
   const destination =
     resolvedOptions.output ??
     defaultOutputPath(input, format, extension);
   await writeFile(destination, result);
   return resolve(destination);
+}
+
+/** CLI publication defaults: Japanese A4 manuscript for vertical, Word A4 for horizontal. */
+function defaultCliPublicationProfile(source: string): ExportProfile {
+  const writingMode = parse(source).document.frontmatter?.entries.find(
+    (entry) => entry.key === "writing-mode" || entry.key === "writingMode",
+  )?.value === "vertical" ? "vertical" : "horizontal";
+  return {
+    layout: {
+      system: writingMode === "vertical" ? "japanese-publisher" : "word",
+    },
+    typesetting: { writingMode },
+  };
 }
 
 function rustTextOutput(source: string, profile: ExportProfile | undefined, format: TextOutputFormat): string {
@@ -140,6 +167,28 @@ export async function loadExportProfile(
       profile.epub.coverPath
     );
   return profile;
+}
+
+/** Load and identify the cover configured in an EPUB publication profile. */
+async function loadEpubCover(profile: ExportProfile): Promise<EpubCover | undefined> {
+  const path = profile.epub?.coverPath;
+  if (!path) return undefined;
+  const data = await readFile(path);
+  if (
+    data.length >= 8 &&
+    data[0] === 0x89 &&
+    data[1] === 0x50 &&
+    data[2] === 0x4e &&
+    data[3] === 0x47 &&
+    data[4] === 0x0d &&
+    data[5] === 0x0a &&
+    data[6] === 0x1a &&
+    data[7] === 0x0a
+  ) return { data, mediaType: "image/png" };
+  if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) {
+    return { data, mediaType: "image/jpeg" };
+  }
+  throw new Error(`EPUB cover must be a PNG or JPEG image: ${path}`);
 }
 
 async function writeTextOutput(destination: string, text: string, format: TextOutputFormat): Promise<void> {

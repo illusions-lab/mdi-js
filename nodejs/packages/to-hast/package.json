@@ -29,7 +29,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@illusions-lab/mdi-remark": "workspace:*",
     "mdast-util-mdi": "workspace:*",
     "mdast-util-to-hast": "^13.0.0"
   },

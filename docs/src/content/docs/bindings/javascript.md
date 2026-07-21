@@ -1,103 +1,114 @@
 ---
 title: JavaScript / TypeScript
-description: "@illusions-lab/mdi — the primary, Rust-backed JavaScript API, with every exported function and its real behavior."
+description: "Use Rust-owned MDI semantics from JavaScript, then choose a baseline or configured export."
 ---
 
-**Prerequisites:** [Getting Started](/guides/getting-started/), [Document IR](/core/document-ir/).
+**Prerequisites:** [Getting Started](/guides/getting-started/) and [Document IR](/core/document-ir/).
 
-## What this binding solves
-
-You need to parse or render `.mdi` documents from Node.js, a bundler-based web app, or any other JavaScript/TypeScript environment, without shelling out to a CLI. `@illusions-lab/mdi` compiles `mdi-core` to WebAssembly and exposes it as ordinary typed functions — there is no JavaScript-side reimplementation of any MDI grammar rule anywhere in this package.
-
-## Install
+## Install and parse first
 
 ```bash
 npm install @illusions-lab/mdi
 ```
 
-Works in Node.js and in any bundler that supports WASM imports (Vite, Webpack 5+, esbuild with a WASM loader). It does not require a native build step on the consumer's machine — the WASM binary ships prebuilt inside the npm package.
-
-## Minimal executable example
+The package runs the MDI parser in prebuilt WebAssembly. It works in Node.js and bundlers with WASM support; it does not need a native build on the consumer machine. Parse before an export UI makes a warning visible instead of silently rendering through it:
 
 ```ts
-import { parse, renderHtml } from "@illusions-lab/mdi";
+import { parse, renderHtmlWithDiagnostics } from "@illusions-lab/mdi";
 
-const source = "第^12^話。{東京|とうきょう}は雨だった。";
-
-const result = parse(source);
-console.log(result.syntaxVersion, result.irVersion); // "2.0" "1.0"
-console.log(result.document.children.length);        // 1 (one paragraph)
-console.log(result.diagnostics);                      // []
-
-console.log(renderHtml(source));
-// <!DOCTYPE html><html lang="ja"><head>...<body><p><span class="mdi-tcy">12</span>話。<ruby class="mdi-ruby">東京<rp>（</rp><rt>とうきょう</rt><rp>）</rp></ruby>は雨だった。</p></body></html>
-```
-
-## Every exported function
-
-```ts
-import {
-  parse,             // (source: string) => MdiSyntaxParseResult
-  renderHtml,        // (source: string) => string
-  renderText,        // (source: string) => string  — the plain "txt" flavor
-  renderTextFormat,  // (source: string, format: MdiTextFormat, indentPrefix?: string) => string
-  renderEpub,        // (source: string) => Uint8Array
-  renderDocx,        // (source: string) => Uint8Array
-  serializeMdi,      // (source: string) => string  — canonical MDI round-trip
-  parseMdiSyntax,     // deprecated alias for `parse`
-  MDI_SPEC_VERSION,   // "2.0"
-  MDI_IR_VERSION,     // "1.0"
-} from "@illusions-lab/mdi";
-
-type MdiTextFormat = "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora";
-```
-
-Every function takes the **complete** source string and does its own full parse internally — there is no separate "parse once, render many times without reparsing" call at the JavaScript level today; each render function calls into Rust's own `parse_document` again. This is a real, current cost if you call several render functions on the same large source and care about parse time, not a documented long-term guarantee.
-
-## Input and output types
-
-```ts
-interface MdiSyntaxParseResult {
-  irVersion: "1.0";
-  syntaxVersion: "2.0";
-  capabilities: { mdi: boolean; commonMark: boolean; gfm: boolean; frontMatter: boolean; sourceSpans: boolean };
-  document: MdiDocument;       // see /core/document-ir/
-  diagnostics: MdiDiagnostic[]; // see /core/diagnostics/
+const source = "# 第一章\n{東京|とうきょう}は雨だった。";
+const parsed = parse(source);
+if (parsed.diagnostics.some((item) => item.severity === "error")) {
+  // Use item.code and its UTF-8 byte span to mark the editor.
 }
+
+const html = renderHtmlWithDiagnostics(source, { bodyOnly: true });
+console.log(html.output);    // semantic contents of <body>
+console.log(html.headings);  // source-order heading text, depth, and spans
 ```
 
-`renderEpub`/`renderDocx` return `Uint8Array` — write them to a file (`fs.writeFile`) or hand them to a `Blob` in a browser; they are not strings and must not be decoded as UTF-8 text. Every other function returns a plain `string`.
+`parse()` returns Rust-owned `document`, `diagnostics`, and UTF-8-byte source spans. At present the only implemented diagnostic code is `mdi.version.unsupported`; malformed inline notation normally uses its literal fallback rather than throwing. `prepareRender(source)` is the same parse-first convenience for a host workflow. The `*WithDiagnostics` helpers return that parser result alongside output; they do not make an invalid document fail automatically.
 
-## Diagnostics and error handling
+`renderHtml(source)` returns a standalone document with the MDI stylesheet. Pass `{ bodyOnly: true }` when the application owns the outer page. `renderHtmlWithDiagnostics` also exposes headings, so navigation and chapter controls need not scrape generated HTML. The stable MDI classes (`mdi-ruby`, `mdi-tcy`, `mdi-em`, `mdi-pagebreak`, and related classes) are part of that semantic HTML.
 
-`parse` almost never throws. It validates that `source` is a string (`TypeError: source must be a string` otherwise) and that the WASM module's `irVersion` matches the constant this package was built against (`Error: Unsupported MDI IR version: ...` — this would only happen from a version-mismatched WASM binary, not from anything in your `.mdi` source). Malformed *MDI syntax itself* never throws — it's represented in the returned tree via each construct's literal-fallback rule, with `diagnostics` reporting only the one currently-implemented case (`mdi.version.unsupported`; see [Diagnostics](/core/diagnostics/)).
+## Choose the export level
+
+The one-argument EPUB and DOCX calls are synchronous Rust baseline exports:
 
 ```ts
-try {
-  parse(42 as unknown as string);
-} catch (error) {
-  console.error(error); // TypeError: source must be a string
-}
+import { renderEpub, renderDocx } from "@illusions-lab/mdi";
+import { writeFile } from "node:fs/promises";
+
+await writeFile("book.epub", renderEpub(source));
+await writeFile("book.docx", renderDocx(source));
 ```
 
-Reserve `try`/`catch` for these programming-error cases. Do not wrap `parse` in `try`/`catch` as a substitute for checking `diagnostics` — a `.mdi` file with typos in it is expected to parse successfully with fallback text, not throw.
+Use the two-argument overloads (or their explicit `WithProfile` names) for a publication export. They are asynchronous because `@illusions-lab/mdi` converts the already-parsed Rust IR to the publication adapters; it does **not** parse MDI source again in JavaScript.
 
-## IR version and UTF-8 byte spans
+```ts
+import { renderEpub, renderDocx } from "@illusions-lab/mdi";
 
-`MDI_IR_VERSION` is `"1.0"` today. `parse` throws if the WASM module ever returns a different `irVersion` than the constant baked into the JS package at build time — this is what prevents a version-skewed WASM binary from being silently misinterpreted. Every span in `document` (see [Document IR](/core/document-ir/)) is a UTF-8 **byte** offset, not a JavaScript string index; see [Diagnostics and UTF-8 source spans](/core/diagnostics/#spans-precisely) for the exact conversion you need before using a span with a JS string or a `<textarea>` selection.
+const epub = await renderEpub(source, {
+  profile: { layout: { system: "japanese-publisher" } },
+  title: "雨の東京",
+  author: "Illusions",
+  language: "ja",
+  publisher: "Illusions Lab",
+  identifier: "urn:isbn:example",
+  date: "2026-07-21",
+  verticalWriting: true,
+  fontFamily: "Yu Mincho",
+  textIndent: 1,
+  chapterSplitLevel: "h1",
+  coverImage: coverBytes,
+  coverMediaType: "image/png",
+});
 
-## Current implementation status
+const docx = await renderDocx(source, {
+  layout: { system: "word" },
+  title: "雨の東京",
+  author: "Illusions",
+  verticalWriting: true,
+  fontFamily: "Yu Mincho",
+  fontSize: 11,
+  lineSpacing: 1.6,
+  textIndent: 1,
+  pagination: { gridMode: "typographic" },
+  pageSize: "A5",
+  landscape: false,
+  margins: { top: 18, right: 15, bottom: 18, left: 15 },
+  showPageNumbers: true,
+  pageNumberPosition: "bottom-center",
+  pageNumberFormat: "simple",
+});
+```
 
-Every function listed above is real and calls Rust directly — none of it is a stub. What's still evolving: `renderEpub`/`renderDocx` are the same "baseline" implementations described in [Rendering model](/core/rendering/#epub-and-docx-what-baseline-means-concretely) (no export-profile cover/chapter-split support yet), and there is no PDF function in this package — PDF requires launching a process, which WASM cannot do (see below).
+Both configured calls also accept the full nested `ExportProfile` schema through `profile` (EPUB) or directly (DOCX). The short fields above are aliases: EPUB supports metadata, writing direction, typeface, indent, chapter split, and a PNG/JPEG `Uint8Array` cover; DOCX supports metadata, direction, page size/orientation/margins, typeface/size/line spacing/indent, and page numbering (`simple`, `dash`, or `fraction`). See [Export profiles](/ecosystem/export-profiles/) for the complete JSON shape.
 
-## What this binding doesn't do
+Every configured export must state `layout.system`. Choose `"japanese-publisher"` for a mirrored Japanese book: horizontal text defaults to 10 pt Mincho on `Shirokuban`, with a strict 27-character × 26-line left-bound grid; vertical text defaults to the A4-landscape novel manuscript, a strict 40-character × 30-line right-bound grid. Choose `"word"` for Word-style flowing pages: its default is A4 with 25.4 mm on every side, no mirror margins, and `gridMode: "typographic"`; `"word"` rejects `"strict"`.
 
-- **No PDF.** `@illusions-lab/mdi` cannot launch Chromium — WASM has no process-spawn capability. Use `@illusions-lab/mdi-cli` or `@illusions-lab/mdi-to-pdf` (a thin wrapper that calls Rust's `render_pdf` from a Node.js host that *can* spawn a process) for PDF.
-- **No grammar of its own.** If you ever find this package disagreeing with the CLI or with Rust directly about what a piece of text means, that is a bug — file it against `mdi-core`, since this package has no independent parsing logic to fix.
-- **No export-profile application.** Passing page size, fonts, or margins is not part of this package's API; that's `@illusions-lab/mdi-export-profile` plus the CLI's `--config` flag — see [Export profiles](/ecosystem/export-profiles/).
+## What remains the semantic owner
 
-## Next steps
+Rust owns parsing, diagnostics, source spans, and the semantic MDI-to-HTML/baseline-export decisions. Publication settings belong to the adapter layer: EPUB/DOCX profile settings shape an archive, while paper geometry, Chromium behavior, and application UI preferences belong to the host. The configured DOCX exporter represents page breaks, vertical text, ordinary paragraph formatting, ruby/tate-chu-yoko/no-break/kern/blank constructs as far as OOXML permits, but it is not a byte-for-byte visual equivalent of browser HTML. Test the generated DOCX in the target Word-compatible reader when those Japanese composition details are critical.
 
-- [Rust Core API status](/core/rust-api/) — the exact Rust functions this package wraps.
-- [Ecosystem: Remark / mdast adapter](/ecosystem/remark/) — using this package's `parse()` from a `unified` pipeline.
-- [Bindings: CLI](/bindings/cli/) — the same functions, from the command line.
+## HTML and PDF hosts
+
+PDF is deliberately in the Node-only entry point, so browser bundles do not acquire a browser launcher:
+
+```ts
+import { preparePdfExport, renderPdfWithChromium } from "@illusions-lab/mdi/node";
+
+// Electron can take this HTML and call its own print-to-PDF API.
+const request = preparePdfExport(source, profile);
+
+// Node uses @illusions-lab/mdi-to-pdf when it is installed.
+const pdf = await renderPdfWithChromium(source, profile);
+```
+
+Install `@illusions-lab/mdi-to-pdf` alongside `@illusions-lab/mdi` for the default Node/Playwright adapter. An Electron host may instead pass `{ renderHtmlToPdf(html, profile, sourceWritingMode) }` to `renderPdfWithChromium`. PDF profiles cover paper, landscape, margins, writing direction, font, font size/line spacing, character/line grids, indentation, and page-number settings. Browser/WASM consumers can use the baseline renderer APIs from the main entry point, but configured publication adapters and PDF are Node/Electron host workflows; send `preparePdfExport()` to a capable host.
+
+## Other exports and errors
+
+`renderText`, `renderTextFormat`, and `serializeMdi` are synchronous Rust functions. `renderTextFormat` accepts `txt`, `txt-ruby`, `narou`, `kakuyomu`, or `aozora` plus an optional indentation prefix. `parseMdiSyntax` is a deprecated alias for `parse`; `MDI_SPEC_VERSION` is `"2.0"` and `MDI_IR_VERSION` is `"1.0"`.
+
+Non-string source is a `TypeError`; invalid option objects are also rejected with `TypeError`. Treat diagnostics as document feedback, and reserve `try`/`catch` for programming, I/O, archive, or host-renderer failures. Source spans are UTF-8 **byte** offsets, not JavaScript string indices; see [Diagnostics](/core/diagnostics/).

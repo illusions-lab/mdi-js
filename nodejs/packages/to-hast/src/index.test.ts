@@ -1,21 +1,23 @@
 import { toHtml } from "hast-util-to-html";
+import { createRequire } from "node:module";
 import type { Root } from "mdast";
 import { describe, expect, it } from "vitest";
-import { unified } from "unified";
-import remarkParse from "remark-parse";
-import remarkMdi from "@illusions-lab/mdi-remark";
 import { cssStringEscape, MDI_STYLESHEET, mdiToHast } from "./index.js";
 
+const require = createRequire(import.meta.url);
+const { parse: parseMdi, toPublicationMdast } = require("../../mdi/dist/index.cjs") as {
+	parse(source: string): { document: unknown };
+	toPublicationMdast(document: unknown): Root;
+};
+
 function html(source: string): string {
-	const processor = unified().use(remarkParse).use(remarkMdi);
-	const tree = processor.runSync(processor.parse(source)) as Root;
+	const tree = toPublicationMdast(parseMdi(source).document);
 	return toHtml(mdiToHast(tree).hast);
 }
 
 describe("mdiToHast", () => {
 	it("returns frontmatter separately from content", () => {
-		const processor = unified().use(remarkParse).use(remarkMdi);
-		const tree = processor.runSync(processor.parse("---\ntitle: 雪女\n---\n本文")) as Root;
+		const tree = toPublicationMdast(parseMdi("---\ntitle: 雪女\n---\n本文").document);
 		const result = mdiToHast(tree);
 
 		expect(result.frontmatter?.title).toBe("雪女");
