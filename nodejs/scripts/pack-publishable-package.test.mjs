@@ -113,6 +113,27 @@ test("npm artifacts replace workspace dependencies and MDI installs for consumer
     );
     assert.doesNotMatch(JSON.stringify(installed), /workspace:/);
 
+    const profileOutput = execFileSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "--eval",
+        `import { prepareChromiumPrintProfile } from "@illusions-lab/mdi-to-pdf/profile";
+         const print = prepareChromiumPrintProfile("<p>本文</p>", undefined, "vertical");
+         console.log(JSON.stringify({
+           hasCss: print.html.includes("mdi-export-profile"),
+           widthMm: print.page.widthMm,
+           heightMm: print.page.heightMm,
+         }));`,
+      ],
+      { cwd: consumerDirectory, encoding: "utf8" }
+    );
+    assert.deepEqual(JSON.parse(profileOutput), {
+      hasCss: true,
+      widthMm: 297,
+      heightMm: 210,
+    });
+
     const source = join(consumerDirectory, "book.mdi");
     writeFileSync(
       source,

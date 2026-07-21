@@ -5,6 +5,7 @@ import remarkMdi from "@illusions-lab/mdi-remark";
 import { resolveExportProfile } from "@illusions-lab/mdi-export-profile";
 import type { Root } from "mdast";
 import { applyPdfProfile, mdiToPdf, renderHtmlToPdf } from "./index.js";
+import { prepareChromiumPrintProfile } from "./profile.js";
 
 describe("mdiToPdf", () =>
   it("generates a browser-rendered PDF", async () => {
@@ -71,6 +72,53 @@ describe("PDF page-number layout", () => {
     );
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
   }, 30_000);
+});
+
+describe("browser-safe Chromium print profile", () => {
+  it("keeps the Playwright adapter and browser hosts on identical CSS", () => {
+    const html = "<html><head></head><body><p>本文</p></body></html>";
+    const profile = {
+      layout: { system: "japanese-publisher" as const },
+      typesetting: { writingMode: "vertical" as const },
+      pagination: {
+        pageSize: "A4" as const,
+        landscape: true,
+        pageNumbers: { enabled: true, format: "fraction" as const, position: "top-right" as const },
+      },
+    };
+    const prepared = prepareChromiumPrintProfile(html, profile);
+
+    expect(prepared.html).toBe(applyPdfProfile(html, prepared.profile));
+    expect(prepared.page).toMatchObject({ widthMm: 297, heightMm: 210, landscape: true });
+    expect(prepared.pageNumbers.headerTemplate).toContain('text-align:right');
+    expect(prepared.pageNumbers.headerTemplate).toContain('class="totalPages"');
+    expect(prepared.pageNumbers.footerTemplate).toBeUndefined();
+  });
+
+  it("uses source writing mode and exposes footer metadata without launching Chromium", () => {
+    const prepared = prepareChromiumPrintProfile("<p>縦書き</p>", undefined, "vertical");
+
+    expect(prepared.html).toContain('<style id="mdi-export-profile">');
+    expect(prepared.html).toContain("writing-mode:vertical-rl");
+    expect(prepared.page).toMatchObject({ widthMm: 297, heightMm: 210, landscape: true });
+    expect(prepared.pageNumbers).toMatchObject({ enabled: true, position: "bottom-center" });
+    expect(prepared.pageNumbers.headerTemplate).toBeUndefined();
+    expect(prepared.pageNumbers.footerTemplate).toContain('class="pageNumber"');
+  });
+
+  it("keeps browser-safe input validation and creates no header/footer for disabled numbering", () => {
+    expect(() => prepareChromiumPrintProfile(null as never)).toThrow("html must be a string");
+    const prepared = prepareChromiumPrintProfile(
+      "<html><body><p>本文</p></body></html>",
+      {
+        layout: { system: "word" },
+        pagination: { pageNumbers: { enabled: false } },
+      },
+    );
+    expect(prepared.html).toContain("<head><style id=\"mdi-export-profile\">");
+    expect(prepared.pageNumbers.headerTemplate).toBeUndefined();
+    expect(prepared.pageNumbers.footerTemplate).toBeUndefined();
+  });
 });
 
 describe("PDF export profile", () => {

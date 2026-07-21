@@ -24,6 +24,24 @@ const pdf = await renderHtmlToPdf(renderHtml("# A Rust-owned document"));
 `mdiToPdf(mdast, profile)` remains available for existing unified consumers,
 but new applications should use the Rust-HTML route above.
 
+## Electron and Web Chromium hosts
+
+Use the browser-safe profile entry when the application already owns Chromium.
+It does not import Playwright, Node built-ins, or launch a browser.
+
+```ts
+import { prepareChromiumPrintProfile } from "@illusions-lab/mdi-to-pdf/profile";
+
+const print = prepareChromiumPrintProfile(html, profile, sourceWritingMode);
+// Load print.html into an Electron BrowserWindow or an iframe and print it.
+// print.page has physical millimetre dimensions and margins.
+// print.pageNumbers contains optional Chromium header/footer templates.
+```
+
+`applyPdfProfile(html, resolvedProfile)` is also exported from this entry for
+hosts that already resolve their profile. Browser hosts should use `print.html`
+for the shared CSS layout; page-number headers and footers remain host-specific.
+
 ## What this package owns
 
 ```text
