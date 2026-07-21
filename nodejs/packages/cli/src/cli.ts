@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { build, loadExportProfile, parseArgs } from "./index.js";
 
@@ -24,6 +25,16 @@ export async function run(argv = process.argv.slice(2)): Promise<number> {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+export function isCliEntrypoint(moduleUrl: string, invokedPath = process.argv[1]): boolean {
+  return Boolean(
+    invokedPath && moduleUrl === pathToFileURL(realpathSync(invokedPath)).href
+  );
+}
+
+// npm exposes bins through `node_modules/.bin` symlinks. Resolve that link
+// before comparing URLs so the packaged CLI, not only a direct source invoke,
+// runs its command handler.
+/* v8 ignore next 3 -- exercised by the packaged-consumer process test. */
+if (isCliEntrypoint(import.meta.url)) {
   process.exitCode = await run();
 }

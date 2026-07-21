@@ -112,6 +112,46 @@ test("npm artifacts replace workspace dependencies and MDI installs for consumer
       )
     );
     assert.doesNotMatch(JSON.stringify(installed), /workspace:/);
+
+    const source = join(consumerDirectory, "book.mdi");
+    writeFileSync(
+      source,
+      "---\ntitle: Packaged CLI\nwriting-mode: vertical\n---\n# 章\n\n{東京|とうきょう}と[[em:強調]]。"
+    );
+    const cli = join(consumerDirectory, "node_modules", ".bin", "mdi");
+    const outputs = {
+      html: join(consumerDirectory, "book.html"),
+      pdf: join(consumerDirectory, "book.pdf"),
+      epub: join(consumerDirectory, "book.epub"),
+      docx: join(consumerDirectory, "book.docx"),
+      txt: join(consumerDirectory, "book.txt"),
+      "txt-ruby": join(consumerDirectory, "book_ruby.txt"),
+      narou: join(consumerDirectory, "book_narou.txt"),
+      kakuyomu: join(consumerDirectory, "book_kakuyomu.txt"),
+      aozora: join(consumerDirectory, "book_aozora.txt"),
+    };
+    for (const [format, output] of Object.entries(outputs)) {
+      execFileSync(cli, ["build", source, "--to", format, "-o", output], {
+        cwd: consumerDirectory,
+        stdio: "inherit",
+      });
+      assert.ok(existsSync(output), `packaged CLI should create ${format}`);
+    }
+    execFileSync(cli, ["build", source, "--to", "txt-all"], {
+      cwd: consumerDirectory,
+      stdio: "inherit",
+    });
+    assert.deepEqual(
+      ["book.txt", "book_ruby.txt", "book_narou.txt", "book_kakuyomu.txt", "book_aozora.txt"].map(
+        (output) => existsSync(join(consumerDirectory, output))
+      ),
+      [true, true, true, true, true]
+    );
+    assert.match(readFileSync(outputs.html, "utf8"), /<ruby(?:\s|>)/);
+    assert.deepEqual(readFileSync(outputs.pdf).subarray(0, 4), Buffer.from("%PDF"));
+    assert.deepEqual(readFileSync(outputs.epub).subarray(0, 2), Buffer.from("PK"));
+    assert.deepEqual(readFileSync(outputs.docx).subarray(0, 2), Buffer.from("PK"));
+    assert.match(readFileSync(outputs["txt-ruby"], "utf8"), /\{東京\|とうきょう\}/);
   } finally {
     rmSync(temporaryDirectory, { recursive: true, force: true });
   }

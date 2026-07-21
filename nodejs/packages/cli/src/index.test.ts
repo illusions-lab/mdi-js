@@ -2,12 +2,13 @@ import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
 import iconv from "iconv-lite";
 import { build, loadExportProfile, parseArgs } from "./index.js";
-import { run as runCli } from "./cli.js";
+import { isCliEntrypoint, run as runCli } from "./cli.js";
 
 const runCommand = promisify(execFile);
 
@@ -101,6 +102,13 @@ describe("parseArgs", () => {
       });
     }
   );
+});
+
+describe("CLI executable entrypoint", () => {
+  it("recognizes the resolved module path used by npm bin symlinks", () => {
+    expect(isCliEntrypoint(import.meta.url, fileURLToPath(import.meta.url))).toBe(true);
+    expect(isCliEntrypoint(import.meta.url, process.execPath)).toBe(false);
+  });
 });
 
 describe("text export", () => {
