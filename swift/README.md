@@ -16,7 +16,7 @@ Add the package to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/illusions-lab/MDI.git", from: "2.0.1"),
+    .package(url: "https://github.com/illusions-lab/MDI.git", from: "2.0.3"),
 ]
 ```
 
@@ -54,7 +54,13 @@ import MDI
 let result = try MDI.parse("{東京|とうきょう}で第^12^話")
 let html = try MDI.renderHTML("# 題\n\n{東京|とうきょう}")
 let epub = try MDI.renderEPUB("# Chapter")
+let note = try MDI.renderTextFormat(
+    "# 題\n\n{東京|とうきょう}",
+    format: .note
+)
 ```
 
 `MDIParseResult.document` is a lossless `MDIJSONValue`, so every node and
 field emitted by the Rust IR is available without Swift-side grammar logic.
+`MDITextFormat` exposes all six Rust-backed text conventions: plain text,
+ruby-preserving text, Narou, Kakuyomu, Aozora Bunko, and note.

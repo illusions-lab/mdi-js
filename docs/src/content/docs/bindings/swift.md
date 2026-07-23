@@ -21,7 +21,7 @@ that uses it:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/illusions-lab/MDI.git", from: "2.0.2"),
+    .package(url: "https://github.com/illusions-lab/MDI.git", from: "2.0.3"),
 ]
 
 // In a target:
@@ -55,11 +55,17 @@ All renderers take MDI source text:
 let html = try MDI.renderHTML("{東京|とうきょう} ^12^")
 let mdi = try MDI.serialize("{東京|とうきょう} ^12^")
 let text = try MDI.renderText("# Title")
+let note = try MDI.renderTextFormat(
+    "# Title\n\n{東京|とうきょう}",
+    format: .note
+)
 
 let epub: Data = try MDI.renderEPUB("# Chapter")
 let docx: Data = try MDI.renderDOCX("# Chapter")
 ```
 
+`MDITextFormat` exposes the same six Rust-owned conventions as the other
+bindings: `plain`, `ruby`, `narou`, `kakuyomu`, `aozora`, and `note`.
 `renderEPUB` and `renderDOCX` return ZIP-based `Data`; write the data to a
 file with the appropriate extension.
 
@@ -83,7 +89,7 @@ do {
 ## Development and releases
 
 The repository's `swift/Package.swift` is the local development package. CI
-builds an XCFramework, runs XCTest with a 90% line-coverage gate for
+builds an XCFramework, runs XCTest with a 95% line-coverage gate for
 `swift/Sources/MDI`, and uploads the report to Codecov. The release workflow
 creates a manifest pull request and publishes the approved artifact after that
 PR is merged. It uses GitHub Actions' built-in token; no PAT or second

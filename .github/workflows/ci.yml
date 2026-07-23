@@ -112,16 +112,36 @@ jobs:
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin,aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install the official W3C EPUBCheck validator
+        run: |
+          curl --fail --location --silent --show-error \
+            https://github.com/w3c/epubcheck/releases/download/v5.3.0/epubcheck-5.3.0.zip \
+            --output "$RUNNER_TEMP/epubcheck.zip"
+          ditto -x -k "$RUNNER_TEMP/epubcheck.zip" "$RUNNER_TEMP"
+
       - name: Build the Apple XCFramework
         run: scripts/package-swift-xcframework.sh "$RUNNER_TEMP/mdi-swift"
 
       - name: Test Swift binding with coverage
+        env:
+          MDI_SWIFT_SMOKE_OUTPUT: ${{ runner.temp }}/swift-package-smoke
         run: |
           mkdir -p swift/Artifacts
           ditto "$RUNNER_TEMP/mdi-swift/MDICore.xcframework" swift/Artifacts/MDICore.xcframework
           scripts/write-swift-package-manifest.sh local "swift/Artifacts/MDICore.xcframework"
           swift test --enable-code-coverage
           scripts/export-swift-coverage.sh swift/coverage.lcov
+
+      - name: Open and validate every Swift package format
+        run: >-
+          scripts/verify-swift-package-formats.sh
+          "$RUNNER_TEMP/swift-package-smoke"
+          "$RUNNER_TEMP/epubcheck-5.3.0/epubcheck.jar"
 
       - name: Upload Swift coverage to Codecov
         uses: codecov/codecov-action@v5
