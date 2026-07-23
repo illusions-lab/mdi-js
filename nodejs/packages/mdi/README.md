@@ -62,11 +62,12 @@ unsupported version.
 
 ## Rendering
 
-Rendering starts from the same Rust IR. Canonical MDI, plain text, HTML, and
-the one-argument baseline EPUB/DOCX renderers execute in Rust and are exposed
-through this package. PDF uses Rust HTML as its input to a host layout adapter such as
-`@illusions-lab/mdi-to-pdf`; the adapter may control Chromium, but it never
-parses MDI or produces semantic HTML.
+Rendering starts from the same Rust IR. Canonical MDI, plain text, HTML, EPUB,
+and DOCX—including profile-configured EPUB and DOCX—execute in Rust and are
+exposed through this package. PDF uses Rust-prepared HTML, print CSS, page
+geometry, and header/footer data as input to a host such as
+`@illusions-lab/mdi-to-pdf`. The host launches Chromium, but it never parses
+MDI or decides publication settings.
 
 Browser WebAssembly cannot start Chromium. Browser code sends Rust-rendered
 HTML to a server or desktop host when it needs PDF output.
@@ -94,25 +95,28 @@ Rust-authoritative parser rather than accepting mutable JavaScript IR. This
 keeps the source spans and error codes predictable and prevents JavaScript from
 becoming a second syntax implementation.
 
-Configuration ownership is deliberately split: Rust owns MDI parsing and
-semantic HTML; publication profiles own EPUB/DOCX metadata and typesetting;
-the host owns Chromium/Electron, paper-printer integration, and application UI
-preferences. This keeps platform-specific pagination controls out of the
-parser and lets Electron supply its own PDF adapter.
+Configuration ownership is deliberately clear: Rust validates publication
+profiles and applies EPUB/DOCX metadata, typography, page geometry, and
+numbering. For PDF, Rust also prepares the print HTML and resolved page data;
+the host owns only Chromium/Electron process control, printer integration, and
+application UI preferences. This keeps layout behavior consistent without
+putting application concerns into the parser.
 
 ### Configured EPUB and DOCX
 
 For publication output, pass an export profile to the overloads (or use the
-explicit `WithProfile` functions). These Node.js-only async paths map the
-Rust-owned IR through the publication adapters and retain configuration for
-metadata, chapter splitting, vertical writing, font selection, paper size,
-margins, and page numbers. EPUB also accepts in-memory PNG or JPEG cover art.
+explicit `WithProfile` functions). The Promise-shaped API is retained for
+compatibility, while profile validation and archive generation both run in
+Rust. It supports metadata, chapter splitting, vertical writing, font
+selection, paper size, margins, and page numbers. EPUB also accepts in-memory
+PNG or JPEG cover art.
 
 ```ts
 import { renderDocxWithProfile, renderEpubWithProfile } from "@illusions-lab/mdi";
 
 const epub = await renderEpubWithProfile(source, {
   profile: {
+    layout: { system: "japanese-publisher" },
     metadata: { title: "Book", author: "Author" },
     typesetting: { writingMode: "vertical", fontFamily: "Noto Serif JP" },
     epub: { chapterSplitLevel: "h1" },
@@ -121,6 +125,7 @@ const epub = await renderEpubWithProfile(source, {
 });
 
 const docx = await renderDocxWithProfile(source, {
+  layout: { system: "word" },
   pagination: { pageSize: "A5", margins: { top: 12, bottom: 12, left: 14, right: 14 } },
 });
 ```

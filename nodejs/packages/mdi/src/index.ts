@@ -62,9 +62,9 @@ export type MdiDocxExportProfile = ExportProfile & {
 	date?: string;
 	verticalWriting?: boolean;
 	fontFamily?: string;
-	/** Point size; requires a publication adapter that supports it. */
+	/** Body type size in typographic points. */
 	fontSize?: number;
-	/** Line-height multiplier; requires a publication adapter that supports it. */
+	/** Baseline multiplier, for example 1.5 for one-and-a-half spacing. */
 	lineSpacing?: number;
 	textIndent?: number;
 	pageSize?: NonNullable<ExportProfile["pagination"]>["pageSize"];
@@ -133,7 +133,7 @@ export interface MdiDocument {
 	children: MdiNode[];
 }
 
-/** Resolved front matter attached to mdast publication-adapter roots. */
+/** Resolved front matter attached to mdast compatibility roots. */
 export interface MdiPublicationFrontmatter {
 	mdi: string;
 	title?: string;
@@ -242,7 +242,7 @@ export function prepareRender(source: string): MdiSyntaxParseResult {
 export function renderEpub(source: string): Uint8Array;
 /**
  * Build a profile-configured EPUB 3 archive. This overload is asynchronous
- * because archive generation is performed by the Node.js publication adapter.
+ * for backward compatibility; validation and archive generation run in Rust.
  */
 export function renderEpub(
 	source: string,
@@ -279,7 +279,7 @@ export function renderEpubWithDiagnostics(
 export function renderDocx(source: string): Uint8Array;
 /**
  * Build a profile-configured DOCX archive. This overload is asynchronous
- * because archive generation is performed by the Node.js publication adapter.
+ * for backward compatibility; validation and OOXML generation run in Rust.
  */
 export function renderDocx(
 	source: string,
@@ -313,10 +313,9 @@ export function renderDocxWithDiagnostics(
 }
 
 /**
- * Build a configured EPUB using the same profile schema as the dedicated
- * publication adapters.  Unlike the one-argument {@link renderEpub}, this
- * returns a Promise and supports cover art, metadata, chapters and vertical
- * writing.
+ * Build a configured EPUB in Rust. Unlike the one-argument
+ * {@link renderEpub}, this returns a Promise for API compatibility and
+ * supports cover art, metadata, chapters and vertical writing.
  */
 export async function renderEpubWithProfile(
 	source: string,
@@ -336,7 +335,7 @@ export async function renderEpubWithProfile(
 }
 
 /**
- * Build a configured DOCX using the shared print profile.  The profile
+ * Build a configured DOCX in Rust using the shared print profile. The profile
  * supports metadata, writing mode, paper size, margins and page numbers.
  */
 export async function renderDocxWithProfile(
@@ -351,13 +350,9 @@ export async function renderDocxWithProfile(
 }
 
 /**
- * Map the Rust-owned IR to mdast for the publication adapters. This is a
- * structural conversion only: all grammar decisions have already been made
- * by {@link parse}, so it never reparses MDI source in JavaScript.
- */
-/**
- * Convert a Rust-owned MDI document IR into mdast for publication adapters.
- * This performs no parsing and preserves the adapter node conventions.
+ * Convert a Rust-owned MDI document IR into mdast for unified compatibility
+ * workflows. This performs no parsing and preserves the established mdast
+ * node conventions.
  */
 export function toPublicationMdast(document: MdiDocument): MdiPublicationRoot {
 	const children = document.children.map(toPublicationMdastNode) as unknown as Root["children"];

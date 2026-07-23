@@ -47,4 +47,4 @@ CLI 以 profile file 為基準讀取 `epub.coverPath`，只接受 PNG/JPEG；cov
 
 明確提供的 `--config` 必須含有 `layout.system`，缺少時 profile 會被拒絕。`"japanese-publisher"` 是書籍 system：橫書預設為 `Shirokuban`/10 pt 明朝體、鏡像左裝訂 27×26 strict grid；直書預設為 A4 landscape 小說原稿、鏡像右裝訂 40×30 strict grid。`"word"` 是另一個流動 system：A4、四邊 25.4 mm、無鏡像、`gridMode: "typographic"`，不能使用 strict grid。
 
-MDI parse/diagnostic/span 的所有權在 Rust。profile 是 publication policy，而 PDF geometry 與 Chromium layout 是 host policy。PDF 需要 `@illusions-lab/mdi-to-pdf` 與 local Chromium；Chromium 收到的是完成 HTML，不是 `.mdi`。DOCX 支援 page/type/numbering，卻不保證 ruby、tate-chu-yoko、禁則/不換行、kern、blank paragraph 與 browser 排版像素一致，請在目標 reader 驗證。
+MDI parse、diagnostic、span、profile validation、紙張目錄與設定型 EPUB/DOCX generation 都由 Rust 負責。PDF 的 print HTML 與 geometry 也由 Rust 準備，host 只提供 machine-specific Chromium process。Chromium 收到的是完成 HTML，不是 `.mdi`。DOCX 支援 page/type/numbering，卻不保證 ruby、tate-chu-yoko、禁則/不換行、kern、blank paragraph 與 browser 排版像素一致，請在目標 reader 驗證。

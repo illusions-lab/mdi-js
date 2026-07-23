@@ -17,10 +17,10 @@ mdi build input.mdi --to html|pdf|epub|docx|txt|txt-ruby|narou|kakuyomu|aozora|t
 ```
 
 HTML, EPUB, DOCX, and text output call `mdi-core` directly through the
-JavaScript binding. PDF passes Rust-rendered HTML to Chromium solely for page
-layout; Chromium never receives or parses MDI source. `--config` currently
-applies PDF and text settings. EPUB and DOCX use Rust's deterministic baseline
-and front matter metadata while their full profile options move into Rust.
+JavaScript binding. With `--config`, Rust also validates and applies EPUB/DOCX
+metadata, typography, chapter splitting, cover art, page geometry, and
+numbering. PDF receives Rust-prepared HTML and print data, then uses Chromium
+solely for page layout; Chromium never receives or parses MDI source.
 
 `txt-all` writes every text variant next to the input and does not accept `-o`.
 The `narou`, `kakuyomu`, and `aozora` variants are contract-tested against
@@ -43,14 +43,15 @@ mdi build novel.mdi --to pdf --config print.json
 
 ## Architecture
 
-The CLI does not parse MDI itself. HTML, EPUB, DOCX, and text call the Rust
-engine through `@illusions-lab/mdi`; PDF gives Rust-rendered HTML to Chromium
-solely for print layout. `--config` currently configures PDF and text output.
+The CLI does not parse MDI or implement publication formats itself. HTML,
+EPUB, DOCX, and text call the Rust engine through `@illusions-lab/mdi`.
+Profile defaults, validation, paper dimensions, and print CSS also come from
+Rust. The host-specific step is launching Chromium for PDF.
 
 ## Documentation
 
 - [CLI guide](https://mdi.illusions.app/bindings/cli/)
-- [Export profiles](https://mdi.illusions.app/guides/export-profiles/)
+- [Export profiles](https://mdi.illusions.app/ecosystem/export-profiles/)
 - [JavaScript documentation](https://mdi.illusions.app/bindings/javascript/)
 
 Part of the [MDI repository](https://github.com/illusions-lab/MDI). MIT licensed.
