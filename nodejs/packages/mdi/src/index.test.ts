@@ -313,7 +313,7 @@ describe("Rust MDI JavaScript binding", () => {
 		expect(tree.data?.frontmatter).toMatchObject({ pageProgression: "ltr" });
 	});
 
-	it("rejects malformed cover shorthands before loading publication adapters", () => {
+	it("rejects malformed cover shorthands before calling Rust", () => {
 		expect(() => renderEpub("text", { cover: { data: new Uint8Array(), mediaType: "image/gif" as never } })).toThrow("options.cover.mediaType");
 		expect(() => renderEpub("text", { coverImage: "not-bytes" as never })).toThrow("options.coverImage");
 		expect(() => renderEpub("text", { coverMediaType: "image/gif" as never })).toThrow("options.coverMediaType");

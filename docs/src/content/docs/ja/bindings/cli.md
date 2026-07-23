@@ -47,4 +47,4 @@ input は UTF-8 です。`--to` は必須、`-o` は output path を上書きし
 
 明示した `--config` には `layout.system` が必須で、ない profile は reject されます。`"japanese-publisher"` は book 用の system です。横書きは `Shirokuban`・10 pt 明朝体・mirror 付き左綴じ 27×26 strict grid、縦書きは A4 landscape 小説原稿・mirror 付き右綴じ 40×30 strict grid が default です。`"word"` は別の flowing system で、A4、四辺 25.4 mm、mirror なし、`gridMode: "typographic"` です。strict grid は使えません。
 
-MDI parsing/diagnostic/span は Rust の責務です。profile は publication policy、PDF geometry と Chromium layout は host policy です。PDF は `@illusions-lab/mdi-to-pdf` と local Chromium を要し、Chromium は `.mdi` ではなく完成 HTML を受け取ります。DOCX は page/type/numbering を設定できますが、ruby、tate-chu-yoko、禁則/改行禁止、kern、blank paragraph が browser と pixel-identical である保証はありません。対象 reader で確認してください。
+MDI parsing、diagnostic、span、profile validation、紙面 catalogue、設定付き EPUB/DOCX generation は Rust の責務です。PDF でも print HTML と geometry は Rust が準備し、host は machine 固有の Chromium process を提供します。Chromium は `.mdi` ではなく完成 HTML を受け取ります。DOCX は page/type/numbering を設定できますが、ruby、tate-chu-yoko、禁則/改行禁止、kern、blank paragraph が browser と pixel-identical である保証はありません。対象 reader で確認してください。

@@ -31,7 +31,7 @@ cd nodejs
 pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm build
-pnpm test
+pnpm test:coverage
 ```
 
 The PDF package tests use Chromium. Install it when working on that package:
@@ -39,6 +39,23 @@ The PDF package tests use Chromium. Install it when working on that package:
 ```sh
 pnpm --filter @illusions-lab/mdi-to-pdf exec playwright install chromium
 ```
+
+Publication changes also need the consumer-facing contract suite:
+
+```sh
+pnpm test:contracts
+```
+
+This suite validates DOCX with the .NET Open XML SDK and imports representative
+documents with LibreOffice. It also checks PDF structure and page geometry,
+validates EPUB with the official W3C EPUBCheck tool, and verifies HTML output.
+Its local dependencies are .NET 8, LibreOffice Writer, Java 21, EPUBCheck 5.3,
+and Chromium. Set `EPUBCHECK_JAR` to the downloaded EPUBCheck JAR before
+running the command.
+
+CI runs these publication contracts only after the Node.js, Rust, Swift,
+Python, and Android unit/coverage jobs have all passed. A renderer change is
+ready to merge only when both layers are green.
 
 ### Android
 

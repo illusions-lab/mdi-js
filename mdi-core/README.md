@@ -30,6 +30,13 @@ When rendering one parsed document in multiple formats, use the
 `*_document` functions, such as `render_html_document`, to avoid parsing it
 again.
 
+Publication profiles are also resolved in Rust. Use
+`render_epub_with_profile` or `render_docx_with_profile` when you need
+metadata, typography, chapter splitting, cover art, page geometry, or page
+numbers. `page_size_catalog_json` exposes the same 67 paper definitions to
+bindings and user interfaces, so other languages do not need to copy the
+dimension table.
+
 ## Documentation
 
 - [API reference](https://docs.rs/mdi-core)

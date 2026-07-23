@@ -23,7 +23,7 @@ hero:
 
 import { Card, CardGrid, Code } from '@astrojs/starlight/components';
 
-<Code code={`{雪女|ゆき.おんな}が現れたのは、第^12^話のことだった。\n彼は[[em:決して]]忘れないと誓った。`} lang="mdi" title="novel.mdi" />
+<Code code={`{雪女|ゆき.おんな}が現れたのは、第^12^話のことだった。\n彼は[[em:決して]]忘れないと誓った。`} lang="markdown" title="novel.mdi" />
 
 <CardGrid>
 	<Card title="One grammar, one implementation" icon="seti:rust">
@@ -36,7 +36,7 @@ import { Card, CardGrid, Code } from '@astrojs/starlight/components';
 		`renderHtml`, `renderTextFormat` (five flavors, including 小説家になろう and 青空文庫 conventions), `renderEpub`, `renderDocx`, and Rust-rendered PDF via Chromium — all implemented today, not planned. See [HTML / TXT / EPUB / DOCX / PDF outputs](/ecosystem/outputs/).
 	</Card>
 	<Card title="Thin, honest language interfaces" icon="puzzle">
-		Rust, Node.js, Swift, Kotlin, and Python are supported today, all backed by the same Rust core. See [Bindings](/bindings/javascript/) for platform-specific setup and APIs.
+		Rust, Node.js, Swift, and Python are supported today, all backed by the same Rust core. The Android / Kotlin binding is still in development and is not yet available as a stable public package on Maven Central. See [Bindings](/bindings/javascript/) for platform-specific setup and APIs.
 	</Card>
 </CardGrid>
 

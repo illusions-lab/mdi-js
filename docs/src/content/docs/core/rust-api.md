@@ -31,13 +31,22 @@ This page lists only symbols present in [`mdi-core/src/lib.rs`](https://github.c
 - `render_text(source: &str) -> String` / `render_text_document(document: &Document) -> String` — deterministic plain text (the `txt` flavor, hardcoded).
 - `render_text_format(source: &str, format: TextFormat, indent_prefix: &str) -> String` — any of the five TXT flavors. `TextFormat` is `Plain | Ruby | Narou | Kakuyomu | Aozora`, parsed from the binding-facing strings `txt`/`txt-ruby`/`narou`/`kakuyomu`/`aozora` via `TextFormat::parse`.
 - `render_epub(source: &str) -> Result<Vec<u8>, String>` / `render_epub_document(document: &Document) -> Result<Vec<u8>, String>` — a complete EPUB 3 archive.
+- `render_epub_with_profile(source: &str, profile_json: &str, cover: Option<&EpubCover>) -> Result<Vec<u8>, String>` / `render_epub_document_with_profile(...)` — configured EPUB metadata, typography, chapter splitting, and optional PNG/JPEG cover data.
 - `render_docx(source: &str) -> Result<Vec<u8>, String>` / `render_docx_document(document: &Document) -> Result<Vec<u8>, String>` — a complete DOCX archive.
+- `render_docx_with_profile(source: &str, profile_json: &str) -> Result<Vec<u8>, String>` / `render_docx_document_with_profile(...)` — configured OOXML page geometry, typography, grids, mirrored margins, and page numbering.
 - `render_pdf(source: &str, options: &PdfOptions) -> Result<Vec<u8>, String>` — Rust-rendered HTML, laid out by a local Chromium. See [Rendering model: the Chromium/PDF boundary](/core/rendering/#the-chromiumpdf-boundary).
 - `find_chromium() -> Option<PathBuf>` — best-effort search for a local Chromium-family executable, used when `PdfOptions.chromium_path` is `None`.
 
+## Publication profiles
+
+- `resolve_export_profile(...)` / `resolve_export_profile_json(...)` — validate and fill the canonical profile, optionally inheriting a document writing mode.
+- `page_dimensions(page_size: &str) -> Option<(f64, f64)>` / `page_size_catalog_json() -> Result<String, String>` — the canonical 67-size physical paper catalogue used by bindings and renderers.
+- `prepare_chromium_print_profile(...)` / its JSON and resolved variants — return styled HTML, millimetre page geometry, margins, and page-number templates for a Chromium host.
+- `apply_pdf_profile(...)` / `apply_pdf_profile_json(...)` — apply the resolved print CSS without launching a browser.
+
 ## Public data types
 
-`ParseOutput`, `ParserCapabilities`, `Diagnostic`, `DiagnosticSeverity`, `SourceSpan`, `Document`, `Frontmatter`, `FrontmatterEntry`, `PdfOptions` (current-generation, `Document`-based API); `MdiSyntaxDocument`, `MdiBlock`, `PagebreakVariant`, `Inline`, `RubyReading` (the older, `parse_mdi_syntax`-only shape — `Inline`/`RubyReading` are also reused internally to build the current-generation `Document`'s MDI nodes, but their `serde` output is what appears inside `Document.children`, not `MdiSyntaxDocument`).
+`ParseOutput`, `ParserCapabilities`, `Diagnostic`, `DiagnosticSeverity`, `SourceSpan`, `Document`, `Frontmatter`, `FrontmatterEntry`, `PdfOptions`, `EpubCover`, `ResolvedExportProfile` and its nested profile/Chromium print types (current-generation API); `MdiSyntaxDocument`, `MdiBlock`, `PagebreakVariant`, `Inline`, `RubyReading` (the older, `parse_mdi_syntax`-only shape — `Inline`/`RubyReading` are also reused internally to build the current-generation `Document`'s MDI nodes, but their `serde` output is what appears inside `Document.children`, not `MdiSyntaxDocument`).
 
 ## Not yet implemented
 
@@ -45,8 +54,8 @@ These exist as concepts in `ARCHITECTURE.md`/`SYNTAX.md` but have **no correspon
 
 - A **standalone validation API** distinct from `parse_output`. Today, the only validation *is* whatever diagnostics `parse_output` returns as part of parsing; there's no separate `validate(document, options)` call.
 - A **normalize** API distinct from `serialize_mdi`. Serialization already applies MDI's recommended-form normalization as a side effect of round-tripping; there's no separate function you'd call just to normalize without also serializing.
-- **Export-profile-aware EPUB/DOCX rendering** — cover images, configurable chapter-split level, page geometry, and font selection for those two formats. `render_epub`/`render_docx` currently only read front-matter metadata (title/author/lang/writing-mode), not an [export profile](/ecosystem/export-profiles/).
-- **Full DOCX typography** — ruby runs, boten character styles, and page geometry in the OOXML output; today `render_docx` flattens MDI typography to plain text runs, the same way `render_text` does.
+
+DOCX now emits native or portable OOXML representations for ruby, tate-chu-yoko, emphasis, kerning, page geometry, and other supported constructs. Word-compatible readers can still differ in Japanese line composition, so this is format support rather than a promise of pixel-identical browser layout.
 
 ## Next steps
 

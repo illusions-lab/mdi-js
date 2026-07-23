@@ -50,7 +50,7 @@ Without `--config`, the CLI chooses its built-in layout from front matter: `writ
 
 When supplied, `--config` must contain `layout.system`; a profile without it is rejected. `"japanese-publisher"` is the book system: horizontal text defaults to a mirrored, left-bound `Shirokuban`/10 pt Mincho 27×26 strict grid; vertical text defaults to the mirrored, right-bound A4-landscape novel-manuscript 40×30 strict grid. `"word"` is a separate flowing system: A4, 25.4 mm margins on all four sides, no mirroring, and `gridMode: "typographic"`; it rejects strict grids.
 
-Semantic MDI parsing and source-span diagnostics remain Rust-owned. Profile values are publication policy: EPUB/DOCX adapters use them to package the parsed IR, while PDF geometry and Chromium layout are host concerns. This keeps application UI preferences and machine-specific browser behavior out of the parser.
+Rust owns semantic parsing, source-span diagnostics, profile validation, the paper catalogue, and configured EPUB/DOCX generation. For PDF it also prepares the print HTML and geometry; the host supplies the machine-specific Chromium process. Application UI preferences stay outside both layers.
 
 ## PDF and DOCX limits
 

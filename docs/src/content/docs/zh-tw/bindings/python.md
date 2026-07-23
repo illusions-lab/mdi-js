@@ -90,7 +90,7 @@ def byte_span_to_str_index(source: str, byte_offset: int) -> int:
 
 - **尚無 PDF function。**Python 可以 spawn subprocess，沒有 WASM 那類根本限制，但 package 今天未 expose `mdi.render_pdf`；Python workflow 的 PDF 暫用 [CLI](/zh-tw/bindings/cli/)。
 - **沒有自己的 grammar。**每個 function 都直接呼叫同一個 `mdi-core`；若與 CLI 或 Rust 不一致，是這個約 60 行 wrapper 的 bug，而不是另一套 parser。
-- **不套用 export profile。**`render_epub`／`render_docx` 只收 `source`，仍是 Rust baseline renderer；cover、分章與頁面幾何尚未接入，見[Rust Core API](/zh-tw/core/rust-api/#尚未實作)。
+- **尚未提供 export profile 參數。**`render_epub`／`render_docx` 目前只收 `source`。設定型 EPUB/DOCX 已在 Rust 實作，只是 Python wrapper 尚未公開 profile 與 cover 參數。
 
 ## 下一步
 

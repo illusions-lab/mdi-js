@@ -5,7 +5,7 @@ import { mdiToMarkdown } from "./to-markdown.js";
 
 /**
  * Serialize a host mdast root to portable MDI source before passing it to the
- * Rust core. This is the sole publication-adapter serialization path.
+ * Rust core. This is the sole mdast compatibility serialization path.
  */
 export function mdastToMdiSource(tree: Root): string {
   const yaml = tree.children.find(

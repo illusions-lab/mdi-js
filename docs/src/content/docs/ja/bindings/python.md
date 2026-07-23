@@ -73,7 +73,7 @@ Python binding は **実装済み・公開済み・テスト済み** です。te
 
 - **PDF function はまだありません。** Python には WASM のような原理的制限はありませんが、現在 `mdi.render_pdf` は export されていません。Python 隣接 workflow の PDF は [CLI](/ja/bindings/cli/) を使ってください。
 - **独自 grammar はありません。** CLI/Rust と差があれば短い wrapper か core のバグです。
-- **export profile を適用しません。** `render_epub`/`render_docx` は source だけを受け、cover、chapter split、page geometry はまだ binding 経由で渡せません。
+- **export profile の引数はまだありません。** `render_epub`/`render_docx` は現在 source だけを受け取ります。設定付き EPUB/DOCX の実装は既に Rust にあり、Python wrapper が profile と cover の引数をまだ公開していない状態です。
 
 ## 次へ
 

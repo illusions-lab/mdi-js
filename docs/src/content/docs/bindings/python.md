@@ -112,7 +112,7 @@ Everything listed above is real, published, and tested — the package's own tes
 
 - **No PDF function yet.** Unlike the [JavaScript/WASM binding](/bindings/javascript/), Python *can* spawn a subprocess — there's no fundamental barrier like WASM's — but `mdi.render_pdf` simply isn't exposed in this package today. Use the [CLI](/bindings/cli/) for PDF output from a Python-adjacent workflow in the meantime.
 - **No grammar of its own.** Every function calls straight into the same `mdi-core` crate every other binding uses; a discrepancy between this binding and the CLI or Rust directly would be a bug in the ~60-line wrapper, not an independent parser to fix.
-- **No export-profile application.** `render_epub`/`render_docx` take only `source`, matching Rust's own current "baseline" renderers (see [Rust Core API status](/core/rust-api/#not-yet-implemented)) — profile-driven cover images, chapter splitting, and page geometry aren't wired through this binding either.
+- **No export-profile arguments yet.** `render_epub`/`render_docx` currently take only `source`. Rust already provides the configured EPUB/DOCX implementation; the Python wrapper has not exposed those profile and cover parameters yet.
 
 ## Next steps
 

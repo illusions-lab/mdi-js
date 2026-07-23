@@ -43,7 +43,7 @@ await writeFile("book.epub", renderEpub(source));
 await writeFile("book.docx", renderDocx(source));
 ```
 
-Use the two-argument overloads (or their explicit `WithProfile` names) for a publication export. They are asynchronous because `@illusions-lab/mdi` converts the already-parsed Rust IR to the publication adapters; it does **not** parse MDI source again in JavaScript.
+Use the two-argument overloads (or their explicit `WithProfile` names) for a publication export. Their Promise-shaped API is kept for compatibility, while profile validation and EPUB/DOCX generation run in Rust. JavaScript neither reparses MDI nor keeps another document generator.
 
 ```ts
 import { renderEpub, renderDocx } from "@illusions-lab/mdi";
@@ -87,9 +87,9 @@ Both configured calls also accept the full nested `ExportProfile` schema through
 
 Every configured export must state `layout.system`. Choose `"japanese-publisher"` for a mirrored Japanese book: horizontal text defaults to 10 pt Mincho on `Shirokuban`, with a strict 27-character × 26-line left-bound grid; vertical text defaults to the A4-landscape novel manuscript, a strict 40-character × 30-line right-bound grid. Choose `"word"` for Word-style flowing pages: its default is A4 with 25.4 mm on every side, no mirror margins, and `gridMode: "typographic"`; `"word"` rejects `"strict"`.
 
-## What remains the semantic owner
+## Where each responsibility lives
 
-Rust owns parsing, diagnostics, source spans, and the semantic MDI-to-HTML/baseline-export decisions. Publication settings belong to the adapter layer: EPUB/DOCX profile settings shape an archive, while paper geometry, Chromium behavior, and application UI preferences belong to the host. The configured DOCX exporter represents page breaks, vertical text, ordinary paragraph formatting, ruby/tate-chu-yoko/no-break/kern/blank constructs as far as OOXML permits, but it is not a byte-for-byte visual equivalent of browser HTML. Test the generated DOCX in the target Word-compatible reader when those Japanese composition details are critical.
+Rust owns parsing, diagnostics, source spans, profile validation, the canonical paper catalogue, and configured EPUB/DOCX generation. For PDF, Rust prepares the styled HTML, page geometry, and page-number templates; the host only controls Chromium and application UI. The configured DOCX exporter represents page breaks, vertical text, ordinary paragraph formatting, ruby/tate-chu-yoko/no-break/kern/blank constructs as far as OOXML permits, but it is not a byte-for-byte visual equivalent of browser HTML. Test the generated DOCX in the Word-compatible reader your users rely on when those Japanese composition details are critical.
 
 ## HTML and PDF hosts
 
@@ -105,7 +105,7 @@ const request = preparePdfExport(source, profile);
 const pdf = await renderPdfWithChromium(source, profile);
 ```
 
-Install `@illusions-lab/mdi-to-pdf` alongside `@illusions-lab/mdi` for the default Node/Playwright adapter. An Electron host may instead pass `{ renderHtmlToPdf(html, profile, sourceWritingMode) }` to `renderPdfWithChromium`. PDF profiles cover paper, landscape, margins, writing direction, font, font size/line spacing, character/line grids, indentation, and page-number settings. Browser/WASM consumers can use the baseline renderer APIs from the main entry point, but configured publication adapters and PDF are Node/Electron host workflows; send `preparePdfExport()` to a capable host.
+Install `@illusions-lab/mdi-to-pdf` alongside `@illusions-lab/mdi` for the default Node/Playwright host. An Electron host may instead pass `{ renderHtmlToPdf(html, profile, sourceWritingMode) }` to `renderPdfWithChromium`. Rust resolves PDF paper, landscape, margins, writing direction, font, font size/line spacing, character/line grids, indentation, and page-number settings. Browser/WASM consumers can create configured EPUB/DOCX locally; PDF alone must send `preparePdfExport()` to a Node, Electron, Tauri, or CLI host that can launch Chromium.
 
 ## Other exports and errors
 
