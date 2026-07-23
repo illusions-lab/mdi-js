@@ -132,13 +132,18 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           BRANCH="swift-release/$VERSION"
-          git switch -c "$BRANCH"
+          git fetch origin "$BRANCH:refs/remotes/origin/$BRANCH" || true
+          git switch -C "$BRANCH"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Package.swift
           git commit -m "Release Swift package $VERSION"
-          git push origin "$BRANCH"
-          gh pr create --base main --head "$BRANCH" --title "Release Swift package $VERSION" --body "Prepared by workflow run $GITHUB_RUN_ID. Merge after the required checks pass, then dispatch **Publish Swift Package** with action **publish** and prepare run ID $GITHUB_RUN_ID."
+          git push --force-with-lease origin "$BRANCH"
+          if gh pr view "$BRANCH" --json number >/dev/null 2>&1; then
+            echo "Updated the existing release manifest pull request."
+          elif ! gh pr create --base main --head "$BRANCH" --title "Release Swift package $VERSION" --body "Prepared by workflow run $GITHUB_RUN_ID. Merge after the required checks pass, then dispatch **Publish Swift Package** with action **publish** and prepare run ID $GITHUB_RUN_ID."; then
+            echo "::notice::The release branch is ready, but GitHub Actions cannot create pull requests in this repository. Create the pull request manually, then merge it after the required checks pass."
+          fi
 
   publish:
     if: inputs.action == 'publish'
