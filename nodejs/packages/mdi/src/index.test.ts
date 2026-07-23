@@ -132,7 +132,7 @@ describe("Rust MDI JavaScript binding", () => {
 		expect(renderTextFormat("{東京|とうきょう}", "txt-ruby")).toBe("{東京|とうきょう}");
 		expect(renderTextFormat("{東京|とうきょう}", "narou")).toBe("｜東京《とうきょう》");
 		expect(renderTextFormat("# 題\n\n{東京|とうきょう} **強調**", "note")).toBe(
-			"## 題\n\n｜東京《とうきょう》 **強調**",
+			"## 題\n\n｜東京《とうきょう》 **強調** ",
 		);
 	});
 

@@ -22,9 +22,9 @@ fn note_is_a_stable_core_text_format_name() {
 }
 
 #[test]
-fn note_preserves_supported_headings_inline_styles_and_ruby() {
+fn note_emits_documented_heading_style_and_ruby_input_sequences() {
     let source = concat!(
-        "# 大見出し\n\n",
+        "# **大見出し**\n\n",
         "## 小見出し\n\n",
         "#### 深い見出し\n\n",
         "**太字**、~~取消~~、*斜体*、",
@@ -36,14 +36,14 @@ fn note_preserves_supported_headings_inline_styles_and_ruby() {
             "## 大見出し\n\n",
             "### 小見出し\n\n",
             "### 深い見出し\n\n",
-            "**太字**、~~取消~~、斜体、",
-            "｜東京《とうきょう》、**｜記事《きじ》**"
+            "**太字** 、~~取消~~ 、斜体、",
+            "｜東京《とうきょう》、**｜記事《きじ》** "
         )
     );
 }
 
 #[test]
-fn note_preserves_quotes_hard_breaks_and_nested_lists() {
+fn note_keeps_lists_readable_with_visual_nesting_clamped_to_note_depth() {
     let source = concat!(
         "> 引用一[[br]]引用二\n\n",
         "1. 親一\n",
@@ -80,6 +80,10 @@ fn note_preserves_code_language_mermaid_and_safe_fences() {
         "```\n\n",
         "````text\n",
         "literal ``` fence\n",
+        "````\n\n",
+        "````mermaid\n",
+        "graph TD\n",
+        "  A[```] --> B\n",
         "````"
     );
     assert_eq!(
@@ -94,6 +98,10 @@ fn note_preserves_code_language_mermaid_and_safe_fences() {
             "```\n\n",
             "````text\n",
             "literal ``` fence\n",
+            "````\n\n",
+            "````\n",
+            "graph TD\n",
+            "  A[```] --> B\n",
             "````"
         )
     );
@@ -114,8 +122,8 @@ fn note_keeps_links_images_tables_and_footnotes_readable_without_data_loss() {
     assert_eq!(
         render(source),
         concat!(
-            "[公式](<https://note.com/info> \"note\") ",
-            "![代替テキスト](<https://example.test/image.png>)\n\n",
+            "公式 (https://note.com/info) — note ",
+            "画像: 代替テキスト (https://example.test/image.png)\n\n",
             "https://www.youtube.com/watch?v=example\n\n",
             "名前\t値\n",
             "東京\t12\n\n",
@@ -155,7 +163,7 @@ fn note_maps_dividers_and_degrades_mdi_only_presentation_syntax() {
 }
 
 #[test]
-fn note_preserves_official_math_literals_and_keeps_markup_literals_visible() {
+fn note_preserves_literals_without_inventing_an_unsupported_escape_syntax() {
     let source = concat!(
         r"\*\*literal bold\*\* and \~\~literal delete\~\~",
         "\n\n",
@@ -168,9 +176,9 @@ fn note_preserves_official_math_literals_and_keeps_markup_literals_visible() {
     assert_eq!(
         render(source),
         concat!(
-            r"\*\*literal bold\*\* and \~\~literal delete\~\~",
+            "**literal bold** and ~~literal delete~~",
             "\n\n",
-            r"literal \|parent《reading》 and \｜親《よみ》",
+            "literal |parent《reading》 and ｜親《よみ》",
             "\n\n",
             "inline $${x * y}$$ remains\n\n",
             "$$\n",
@@ -185,7 +193,7 @@ fn note_degrades_inline_code_and_readably_wraps_raw_html() {
     assert_eq!(
         render("`` value with ` tick ``\n\n<section>raw</section>"),
         concat!(
-            "value with \\` tick\n\n",
+            "value with ` tick\n\n",
             "```html\n",
             "<section>raw</section>\n",
             "```"
@@ -194,7 +202,7 @@ fn note_degrades_inline_code_and_readably_wraps_raw_html() {
 }
 
 #[test]
-fn note_degrades_unrepresentable_ruby_to_escaped_readable_base_text() {
+fn note_degrades_unrepresentable_ruby_to_readable_base_text() {
     assert_eq!(render("{親文字|よ《み}"), "親文字");
     assert_eq!(render("{親|}"), "親");
 }

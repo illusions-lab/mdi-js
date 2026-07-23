@@ -355,7 +355,7 @@ describe("CLI command output", () => {
       await expect(runCli(["build", input, "--to", "note"])).resolves.toBe(0);
       expect(log).toHaveBeenCalledWith(`Written ${output}`);
       expect(await readFile(output, "utf8")).toBe(
-        "## 題\n\n｜東京《とうきょう》 **強調**"
+        "## 題\n\n｜東京《とうきょう》 **強調** "
       );
     } finally {
       log.mockRestore();

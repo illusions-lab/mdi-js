@@ -797,8 +797,8 @@ HTML・PDF・EPUB は同じ CSS 駆動の描画モデルを共有しますが、
 
 | Flavor | Purpose / 用途 |
 |--------|----------------|
-| `plain` | Simplest export: ruby discarded, every macro flattened to base text. / 最も単純な書き出し。ルビは破棄。 |
-| `ruby-paren` | Ruby rendered as fullwidth parentheses: `漢字（かんじ）`. / ルビを全角括弧で表現。 |
+| `txt` | Simplest export: ruby discarded, every macro flattened to base text. / 最も単純な書き出し。ルビは破棄。 |
+| `txt-ruby` | Ruby kept in round-trippable MDI form: `{漢字\|かんじ}`. / ルビを再解析可能な MDI 形式で保持。 |
 | `narou` | 小説家になろう submission format. Ruby via `｜《》`; boten via per-character dot ruby (the site has no boten notation). / 小説家になろうの投稿フォーマット。ルビは `｜《》`、傍点はサイトに専用記法がないため一字ずつの圏点ルビで表現。 |
 | `kakuyomu` | カクヨム submission format. Ruby via `｜《》`; boten via the site's native `《《》》` notation. / カクヨムの投稿フォーマット。ルビは `｜《》`、傍点はサイト固有の `《《》》` 記法。 |
 | `aozora` | Aozora Bunko (青空文庫) annotation ("注記") convention. / 青空文庫注記形式。 |
@@ -809,10 +809,10 @@ The four platform flavors are contract-bound to platform-owned documentation: [N
 
 ### Mapping table / 対応表
 
-| MDI | `plain` | `ruby-paren` | `narou` | `kakuyomu` | `aozora` |
+| MDI | `txt` | `txt-ruby` | `narou` | `kakuyomu` | `aozora` |
 |-----|---------|--------------|---------|------------|----------|
-| `{東京\|とうきょう}` (group ruby) | `東京` | `東京（とうきょう）` | `｜東京《とうきょう》` (base/reading 1–10 characters; `&"<>` rejected) | `｜東京《とうきょう》` (base ≤20, reading ≤50) | `｜東京《とうきょう》` |
-| `{東京\|とう.きょう}` (split ruby) | `東京` | `東京（とうきょう）` (dots removed) | `｜東京《とうきょう》` | same notation, with Kakuyomu limits | `｜東京《とうきょう》` |
+| `{東京\|とうきょう}` (group ruby) | `東京` | `{東京\|とうきょう}` | `｜東京《とうきょう》` (base/reading 1–10 characters; `&"<>` rejected) | `｜東京《とうきょう》` (base ≤20, reading ≤50) | `｜東京《とうきょう》` |
+| `{東京\|とう.きょう}` (split ruby) | `東京` | `{東京\|とう.きょう}` | `｜東京《とうきょう》` | same notation, with Kakuyomu limits | `｜東京《とうきょう》` |
 | `^12^` (tate-chu-yoko) | `12` | `12` | `12` (no convention; flattened) | same as narou | `12［＃「12」は縦中横］` |
 | `[[em:それ]]` (boten, default mark) | `それ` | `それ` | `｜そ《・》｜れ《・》` (per-character valid ruby; `<mark>` dropped) | `《《それ》》` (native Kakuyomu notation; `<mark>` dropped) | `［＃傍点］それ［＃傍点終わり］` (recognized marks map to official names, e.g. `●`→`丸傍点`, `﹆`→`白ゴマ傍点`) |
 | `[[no-break:...]]` | text kept, macro dropped | same | same | same | same (no aozora equivalent) |
@@ -829,31 +829,50 @@ The four platform flavors are contract-bound to platform-owned documentation: [N
 ### note mapping / note 対応
 
 The `note` flavor emits `##` for an MDI H1 and `###` for every deeper heading,
-because note exposes only large and small headings. Strong, GFM deletion,
-ordered/unordered lists, block quotes, fenced code (including `mermaid`),
-thematic breaks, native ruby, and note TeX literals retain their documented
-spellings. Split ruby readings concatenate without MDI's dots. Tables become
+because note exposes only large and small headings. It emits the documented
+editor-input sequences for strong, GFM deletion, ordered/unordered lists,
+block quotes, fenced code, and thematic breaks. Strong/delete sequences include
+the required following half-width space. These are interactive editor
+shortcuts, not a whole-document Markdown import contract: consumers may need
+to retype a marker plus space/Return. Visual list indentation remains readable,
+but real nesting must be set with note's Tab/Shift+Tab controls. Only an exact
+triple-backtick `mermaid` block carries note's documented diagram contract.
+Native ruby and supported body-context TeX literals retain their documented
+notation. Split ruby readings concatenate without MDI's dots. Tables become
 tab-separated text; footnotes become numbered references and end notes.
 Unsupported page typography (tate-chu-yoko, boten, warichu, kerning, no-break,
 alignment, and pagination) MUST retain readable content but MAY lose styling.
-Links and images MUST retain their label/alt and URL, but an exporter MUST NOT
-claim that note will import Markdown link/image syntax: applying text links,
-uploading images, setting alt/captions/alignment, quote sources, TOC, cover,
-attachments, native audio, and comic content are editor-only operations.
+Page breaks become visual dividers and lose pagination semantics. Links and
+images MUST retain their label/alt and URL as readable text, but an exporter
+MUST NOT claim that note will import Markdown link/image syntax. Applying text
+links, uploading images, setting alt/descriptions/alignment, quote sources,
+TOC, cover, attachments, native audio, and comic content are editor-only
+operations. note documents no backslash escape for shortcut/ruby delimiters,
+so literal delimiter collisions have no lossless representation in this
+plain-text profile. `--to note` is neither WXR nor MT and MUST NOT be described
+as input for note's Import screen.
 
 `note` フレーバーは、MDI H1 を `##`、それより深い見出しを `###` とします。
-strong、GFM delete、list、引用、fenced code（`mermaid` を含む）、区切り線、
-note native ruby、note TeX literal は公式表記を保持します。table は TSV、
+strong、GFM delete、list、引用、fenced code、区切り線は公式の editor-input
+sequence を出力し、strong/delete には必要な末尾の半角空白を含めます。
+これらは文書全体の Markdown import 契約ではないため、marker と空白／Return
+の再入力が必要な場合があります。list の字下げは可読性のためで、実際の
+階層は note の Tab／Shift+Tab で設定します。Mermaid の公式契約は exact
+triple-backtick `mermaid` block に限ります。note native ruby と対応する
+本文 context の TeX literal は公式表記を保持します。table は TSV、
 footnote は番号参照と文末注へ変換します。縦中横・傍点・割注・kerning・
 no-break・配置・改ページは可読内容を残して style を失ってもよい（MAY）。
-link/image は label/alt と URL を保持しなければなりません（MUST）が、
-note が Markdown link/image を import するとは主張してはなりません
-（MUST NOT）。upload、配置、caption、引用元、目次、cover 等は UI 操作です。
+改ページは視覚的な区切り線となり pagination semantics を失います。
+link/image は label/alt と URL を可読 text として保持しなければなりません
+（MUST）が、note が Markdown link/image を import するとは主張しては
+なりません（MUST NOT）。note には shortcut/ruby delimiter の公式
+backslash escape がないため、literal collision は lossless に表現できません。
+`--to note` は WXR/MT ではなく、note Import 画面の入力ではありません。
 
 Literal platform delimiters are protected according to the same contracts: Kakuyomu `《` becomes `｜《`; Narou parenthesized prose gets the documented leading vertical bar so it is not mistaken for shorthand ruby; and Aozora's nine reserved characters are emitted with the official external-character annotations. The CLI writes Aozora files as Shift_JIS with CRLF and rejects characters outside that repertoire instead of silently replacing them with `?`.
 プラットフォームの区切り記号を本文として書く場合も、同じ公式契約に従います。カクヨムの `《` は `｜《`、なろうの括弧書きは簡易ルビと誤認されないよう公式どおり直前に縦線を置き、青空文庫の予約済み9文字は公式の外字注記へ変換します。CLI の青空文庫ファイルは Shift_JIS・CRLF で、範囲外文字を `?` に黙って置換せずエラーにします。
 
-Implementations MAY offer additional flavors beyond these five; they are the minimum interoperability baseline so that `.mdi → txt` conversions stay predictable across tools.  
+Implementations MAY offer additional flavors beyond these six; they are the minimum interoperability baseline so that `.mdi → txt` conversions stay predictable across tools.
 実装はこれ以外のフレーバーを追加してもよい（MAY）。上記 6 種類は、`.mdi → txt` の変換がツール間で予測可能であるための最小限の相互運用ベースラインです。
 
 ---

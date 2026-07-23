@@ -1323,14 +1323,18 @@ fn render_note_document(document: &Document, indent_prefix: &str) -> String {
     let mut blocks = document
         .children
         .iter()
-        .filter_map(|node| note_format_block(node, indent_prefix, &definitions))
+        .filter_map(|node| {
+            note_format_block(node, indent_prefix, &definitions, NoteInlineContext::Body)
+        })
         .collect::<Vec<_>>();
     if !definitions.is_empty() {
         let mut footnotes = vec!["注".to_owned()];
         for (index, definition) in definitions.iter().enumerate() {
             let value = children(definition)
                 .iter()
-                .filter_map(|child| note_format_block(child, "", &definitions))
+                .filter_map(|child| {
+                    note_format_block(child, "", &definitions, NoteInlineContext::Body)
+                })
                 .collect::<Vec<_>>()
                 .join(" ");
             footnotes.push(format!("{}. {value}", index + 1));
@@ -1341,10 +1345,18 @@ fn render_note_document(document: &Document, indent_prefix: &str) -> String {
     blocks.join("\n\n")
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum NoteInlineContext {
+    Body,
+    Heading,
+    Quote,
+}
+
 fn note_format_block(
     node: &serde_json::Value,
     indent_prefix: &str,
     definitions: &[&serde_json::Value],
+    context: NoteInlineContext,
 ) -> Option<String> {
     let kind = node
         .get("type")
@@ -1360,7 +1372,7 @@ fn note_format_block(
                 .unwrap_or_default();
             Some(format!(
                 "{indent_prefix}{indent}{}",
-                note_inline_children(node, definitions)
+                note_inline_children(node, definitions, context)
             ))
         }
         "heading" => {
@@ -1376,14 +1388,16 @@ fn note_format_block(
             };
             Some(format!(
                 "{marker} {}",
-                note_inline_children(node, definitions)
+                note_inline_children(node, definitions, NoteInlineContext::Heading)
             ))
         }
-        "list" => Some(note_format_list(node, 0, definitions)),
+        "list" => Some(note_format_list(node, 0, definitions, context)),
         "blockquote" => {
             let value = children(node)
                 .iter()
-                .filter_map(|child| note_format_block(child, "", definitions))
+                .filter_map(|child| {
+                    note_format_block(child, "", definitions, NoteInlineContext::Quote)
+                })
                 .collect::<Vec<_>>()
                 .join("\n\n");
             Some(
@@ -1412,7 +1426,7 @@ fn note_format_block(
                 .map(|row| {
                     children(row)
                         .iter()
-                        .map(|cell| note_inline_children(cell, definitions))
+                        .map(|cell| note_inline_children(cell, definitions, context))
                         .collect::<Vec<_>>()
                         .join("\t")
                 })
@@ -1430,7 +1444,7 @@ fn note_format_block(
                 .unwrap_or_default(),
             Some("html"),
         )),
-        _ if !children(node).is_empty() => Some(note_inline_children(node, definitions)),
+        _ if !children(node).is_empty() => Some(note_inline_children(node, definitions, context)),
         _ => None,
     }
 }
@@ -1439,9 +1453,12 @@ fn note_format_list(
     node: &serde_json::Value,
     depth: usize,
     definitions: &[&serde_json::Value],
+    context: NoteInlineContext,
 ) -> String {
-    // note's editor supports five list levels.  Deeper source remains readable
-    // at the fifth level instead of drifting indefinitely to the right.
+    // note's editor supports five list levels, but its documented hierarchy
+    // controls are Tab/Shift+Tab (or their shortcuts), not space indentation.
+    // Indentation here is therefore a readable visual fallback, clamped at
+    // five levels rather than a claim that paste will create nested list nodes.
     let indentation = "  ".repeat(depth.min(4));
     let continuation = "  ".repeat((depth + 1).min(5));
     let ordered = node
@@ -1471,7 +1488,7 @@ fn note_format_list(
             {
                 lines.push(format!(
                     "{indentation}{marker} {checked}{}",
-                    note_inline_children(child, definitions)
+                    note_inline_children(child, definitions, context)
                 ));
                 item_started = true;
                 continue;
@@ -1481,10 +1498,10 @@ fn note_format_list(
                     lines.push(format!("{indentation}{marker} {checked}"));
                     item_started = true;
                 }
-                lines.push(note_format_list(child, depth + 1, definitions));
+                lines.push(note_format_list(child, depth + 1, definitions, context));
                 continue;
             }
-            if let Some(value) = note_format_block(child, "", definitions) {
+            if let Some(value) = note_format_block(child, "", definitions, context) {
                 if !item_started {
                     lines.push(format!("{indentation}{marker} {checked}"));
                     item_started = true;
@@ -1499,14 +1516,22 @@ fn note_format_list(
     lines.join("\n")
 }
 
-fn note_inline_children(node: &serde_json::Value, definitions: &[&serde_json::Value]) -> String {
+fn note_inline_children(
+    node: &serde_json::Value,
+    definitions: &[&serde_json::Value],
+    context: NoteInlineContext,
+) -> String {
     children(node)
         .iter()
-        .map(|child| note_inline(child, definitions))
+        .map(|child| note_inline(child, definitions, context))
         .collect()
 }
 
-fn note_inline(node: &serde_json::Value, definitions: &[&serde_json::Value]) -> String {
+fn note_inline(
+    node: &serde_json::Value,
+    definitions: &[&serde_json::Value],
+    context: NoteInlineContext,
+) -> String {
     let kind = node
         .get("type")
         .and_then(serde_json::Value::as_str)
@@ -1524,12 +1549,17 @@ fn note_inline(node: &serde_json::Value, definitions: &[&serde_json::Value]) -> 
                 .and_then(serde_json::Value::as_str)
                 .unwrap_or_default(),
         ),
-        "inlineMath" => format!(
-            "$${{{}}}$$",
-            node.get("value")
+        "inlineMath" => {
+            let value = node
+                .get("value")
                 .and_then(serde_json::Value::as_str)
-                .unwrap_or_default()
-        ),
+                .unwrap_or_default();
+            if matches!(context, NoteInlineContext::Body) {
+                format!("$${{{value}}}$$")
+            } else {
+                note_text_literal(value)
+            }
+        }
         "tcy" => note_text_literal(
             node.get("value")
                 .and_then(serde_json::Value::as_str)
@@ -1554,10 +1584,28 @@ fn note_inline(node: &serde_json::Value, definitions: &[&serde_json::Value]) -> 
                 .unwrap_or_default();
             text_format_platform_ruby(base, &reading, TextFormat::Note)
         }
-        "strong" => format!("**{}**", note_inline_children(node, definitions)),
-        "delete" => format!("~~{}~~", note_inline_children(node, definitions)),
+        "strong" => {
+            let value = note_inline_children(node, definitions, context);
+            if matches!(context, NoteInlineContext::Heading) {
+                value
+            } else {
+                // note activates this input shortcut after a following
+                // half-width space is entered.
+                format!("**{value}** ")
+            }
+        }
+        "delete" => {
+            let value = note_inline_children(node, definitions, context);
+            if matches!(context, NoteInlineContext::Heading) {
+                value
+            } else {
+                // note activates this input shortcut after a following
+                // half-width space is entered.
+                format!("~~{value}~~ ")
+            }
+        }
         "link" => {
-            let label = note_inline_children(node, definitions);
+            let label = note_inline_children(node, definitions, context);
             let url = node
                 .get("url")
                 .and_then(serde_json::Value::as_str)
@@ -1570,11 +1618,13 @@ fn note_inline(node: &serde_json::Value, definitions: &[&serde_json::Value]) -> 
                 return note_text_literal(url);
             }
             let title = title_value
-                .map(|title| format!(" \"{}\"", title.replace('"', "\\\"")))
+                .map(|title| format!(" — {title}"))
                 .unwrap_or_default();
-            note_link_destination(url)
-                .map(|destination| format!("[{label}]({destination}{title})"))
-                .unwrap_or_else(|| format!("{label} ({})", note_text_literal(url)))
+            if url.is_empty() {
+                format!("{label}{title}")
+            } else {
+                format!("{label} ({}){title}", note_text_literal(url))
+            }
         }
         "image" => {
             let alt = note_text_literal(
@@ -1586,9 +1636,11 @@ fn note_inline(node: &serde_json::Value, definitions: &[&serde_json::Value]) -> 
                 .get("url")
                 .and_then(serde_json::Value::as_str)
                 .unwrap_or_default();
-            note_link_destination(url)
-                .map(|destination| format!("![{alt}]({destination})"))
-                .unwrap_or_else(|| format!("[画像: {alt}] ({})", note_text_literal(url)))
+            if url.is_empty() {
+                format!("画像: {alt}")
+            } else {
+                format!("画像: {alt} ({})", note_text_literal(url))
+            }
         }
         "html" => note_text_literal(
             node.get("value")
@@ -1615,20 +1667,21 @@ fn note_inline(node: &serde_json::Value, definitions: &[&serde_json::Value]) -> 
         // note has no paste syntax for these MDI presentation annotations or
         // Markdown emphasis, so retain their readable content.
         "emphasis" | "em" | "warichu" | "kern" | "noBreak" => {
-            note_inline_children(node, definitions)
+            note_inline_children(node, definitions, context)
         }
-        _ => note_inline_children(node, definitions),
+        _ => note_inline_children(node, definitions, context),
     }
 }
 
-fn note_link_destination(url: &str) -> Option<String> {
-    (!url.is_empty() && !url.contains(['<', '>', '\r', '\n'])).then(|| format!("<{url}>"))
-}
-
 fn note_code_block(value: &str, language: Option<&str>) -> String {
-    let fence = "`".repeat(longest_backtick_run(value).saturating_add(1).max(3));
+    let longest_run = longest_backtick_run(value);
+    let fence = "`".repeat(longest_run.saturating_add(1).max(3));
     let language = language
         .filter(|language| !language.is_empty() && !language.contains(['`', '\r', '\n', ' ', '\t']))
+        // note documents Mermaid only with an exact triple-backtick fence.
+        // If the body forces a longer fence, keep the code readable without
+        // falsely labelling it as a Mermaid contract.
+        .filter(|language| *language != "mermaid" || longest_run < 3)
         .unwrap_or_default();
     let trailing_newline = if value.ends_with('\n') { "" } else { "\n" };
     format!("{fence}{language}\n{value}{trailing_newline}{fence}")
@@ -1643,47 +1696,11 @@ fn longest_backtick_run(value: &str) -> usize {
 }
 
 fn note_text_literal(value: &str) -> String {
-    let mut output = String::new();
-    let mut index = 0;
-    while index < value.len() {
-        let rest = &value[index..];
-        let math_end = if let Some(math) = rest.strip_prefix("$${") {
-            math.find("}$$").map(|end| "$${".len() + end + "}$$".len())
-        } else if let Some(math) = rest.strip_prefix("$$\n") {
-            math.find("\n$$")
-                .map(|end| "$$\n".len() + end + "\n$$".len())
-        } else {
-            None
-        };
-        if let Some(end) = math_end {
-            output.push_str(&rest[..end]);
-            index += end;
-            continue;
-        }
-        let character = rest.chars().next().expect("index is in bounds");
-        if matches!(
-            character,
-            '\\' | '*'
-                | '_'
-                | '~'
-                | '`'
-                | '['
-                | ']'
-                | '#'
-                | '+'
-                | '-'
-                | '!'
-                | '<'
-                | '>'
-                | '|'
-                | '｜'
-        ) {
-            output.push('\\');
-        }
-        output.push(character);
-        index += character.len_utf8();
-    }
-    output
+    // note does not document a backslash escape for editor shortcuts or ruby.
+    // Inventing one would visibly corrupt ordinary punctuation.  Preserve
+    // literal text and document that delimiter collisions cannot be represented
+    // losslessly by this plain-text profile.
+    value.to_owned()
 }
 
 fn text_format_block(
@@ -2641,10 +2658,15 @@ fn write_epub_document_with_profile<W: Write + Seek>(
         .iter()
         .enumerate()
         .map(|(index, chapter)| {
+            let chapter_title = if chapter.title.trim().is_empty() {
+                format!("Chapter {}", index + 1)
+            } else {
+                chapter.title.clone()
+            };
             format!(
                 "<li><a href=\"chapter-{}.xhtml\">{}</a></li>",
                 index + 1,
-                escape_html(&chapter.title)
+                escape_html(&chapter_title)
             )
         })
         .collect::<String>();
@@ -2688,7 +2710,7 @@ fn write_epub_document_with_profile<W: Write + Seek>(
         epub_file(
             zip,
             &format!("OEBPS/chapter-{}.xhtml", index + 1),
-            &epub_xhtml(
+            &epub_chapter_xhtml(
                 if chapter.title.is_empty() {
                     title
                 } else {
@@ -2707,7 +2729,20 @@ fn write_epub_document_with_profile<W: Write + Seek>(
         ),
         _ => String::new(),
     };
-    let manifest = format!("<item id=\"nav\" href=\"nav.xhtml\" media-type=\"application/xhtml+xml\" properties=\"nav\"/><item id=\"css\" href=\"style.css\" media-type=\"text/css\"/>{cover_manifest}{}", chapters.iter().enumerate().map(|(index, _)| format!("<item id=\"chapter-{}\" href=\"chapter-{}.xhtml\" media-type=\"application/xhtml+xml\"/>", index + 1, index + 1)).collect::<String>());
+    let chapter_manifest = chapters
+        .iter()
+        .enumerate()
+        .map(|(index, _)| {
+            format!(
+                "<item id=\"chapter-{}\" href=\"chapter-{}.xhtml\" media-type=\"application/xhtml+xml\"/>",
+                index + 1,
+                index + 1
+            )
+        })
+        .collect::<String>();
+    let manifest = format!(
+        "<item id=\"nav\" href=\"nav.xhtml\" media-type=\"application/xhtml+xml\" properties=\"nav\"/><item id=\"css\" href=\"style.css\" media-type=\"text/css\"/>{cover_manifest}{chapter_manifest}"
+    );
     let chapter_spine = chapters
         .iter()
         .enumerate()
@@ -2994,8 +3029,42 @@ fn epub_xhtml(title: &str, language: &str, body: &str) -> String {
         escape_html(language),
         escape_html(language),
         escape_html(title),
-        body.replace("<br>", "<br/>").replace("<hr>", "<hr/>")
+        body
     )
+}
+
+fn epub_chapter_xhtml(title: &str, language: &str, body: &str) -> String {
+    epub_xhtml(title, language, &epub_chapter_body(body))
+}
+
+fn epub_chapter_body(body: &str) -> String {
+    let mut output = body.replace("<br>", "<br/>").replace("<hr>", "<hr/>");
+    let mut search_from = 0;
+    while let Some(relative_start) = output[search_from..].find("<img src=\"") {
+        let start = search_from + relative_start;
+        let Some(relative_end) = output[start..].find('>') else {
+            break;
+        };
+        let end = start + relative_end;
+        let image = &output[start..=end];
+        let Some(attributes) = image.strip_prefix("<img src=\"") else {
+            search_from = end + 1;
+            continue;
+        };
+        let Some((source, alt)) = attributes.split_once("\" alt=\"") else {
+            search_from = end + 1;
+            continue;
+        };
+        let Some(alt) = alt.strip_suffix("\">") else {
+            search_from = end + 1;
+            continue;
+        };
+        let replacement =
+            format!("<span class=\"mdi-image-fallback\">Image: {alt} ({source})</span>");
+        output.replace_range(start..=end, &replacement);
+        search_from = start + replacement.len();
+    }
+    output
 }
 
 #[cfg(not(feature = "wasm"))]
@@ -4570,6 +4639,22 @@ mod tests {
                     ]
                 }),
                 serde_json::json!({
+                    "type":"heading",
+                    "depth":1,
+                    "children":[
+                        {"type":"strong", "children":[{"type":"text", "value":"heading"}]},
+                        {"type":"text", "value":" "},
+                        {"type":"inlineMath", "value":"x < y"}
+                    ]
+                }),
+                serde_json::json!({
+                    "type":"blockquote",
+                    "children":[{
+                        "type":"paragraph",
+                        "children":[{"type":"inlineMath", "value":"quoted"}]
+                    }]
+                }),
+                serde_json::json!({
                     "type":"list",
                     "ordered":false,
                     "children":[{"type":"listItem", "checked":true, "children":[]}]
@@ -4585,9 +4670,11 @@ mod tests {
         let rendered = render_note_document(&document, "");
         assert!(rendered.contains("$$\nx < y\n$$"));
         assert!(rendered.contains("$${x < y}$$"));
-        assert!(rendered.contains(r"\<i\>raw\</i\>"));
-        assert!(rendered.contains(r"link (https://example.test/a\>b)"));
-        assert!(rendered.contains("[画像: alt] ()［注0］"));
+        assert!(rendered.contains("<i>raw</i>"));
+        assert!(rendered.contains("link (https://example.test/a>b)"));
+        assert!(rendered.contains("画像: alt［注0］"));
+        assert!(rendered.contains("## heading x < y"));
+        assert!(rendered.contains("> quoted"));
         assert!(rendered.contains("- [x] "));
         assert!(rendered.contains("readable"));
     }
@@ -4679,6 +4766,44 @@ mod tests {
         assert!(opf.contains("<meta property=\"dcterms:modified\">"));
         assert!(opf.contains("page-progression-direction=\"rtl\""));
         assert!(opf.contains("chapter-2.xhtml"));
+    }
+
+    #[test]
+    fn packages_epub_xhtml_with_nonempty_navigation_and_readable_image_fallbacks() {
+        let bytes = render_epub(
+            "---\ntitle: Test\n---\n\nopening\n\n[[pagebreak]]\n\n![remote](https://example.com/image.png)",
+        )
+        .unwrap();
+        let mut zip = ZipArchive::new(Cursor::new(bytes)).unwrap();
+
+        let mut navigation = String::new();
+        zip.by_name("OEBPS/nav.xhtml")
+            .unwrap()
+            .read_to_string(&mut navigation)
+            .unwrap();
+        assert!(navigation.contains(">Chapter 1</a>"));
+        assert!(navigation.contains(">Chapter 2</a>"));
+        assert!(!navigation.contains("></a>"));
+
+        let mut opf = String::new();
+        zip.by_name("OEBPS/package.opf")
+            .unwrap()
+            .read_to_string(&mut opf)
+            .unwrap();
+        assert!(opf.contains(
+            "id=\"chapter-2\" href=\"chapter-2.xhtml\" media-type=\"application/xhtml+xml\"/"
+        ));
+        assert!(!opf.contains("remote-resources"));
+
+        let mut chapter = String::new();
+        zip.by_name("OEBPS/chapter-2.xhtml")
+            .unwrap()
+            .read_to_string(&mut chapter)
+            .unwrap();
+        assert!(chapter.contains(
+            "<span class=\"mdi-image-fallback\">Image: remote (https://example.com/image.png)</span>"
+        ));
+        assert!(!chapter.contains("<img"));
     }
 
     #[test]
