@@ -82,6 +82,29 @@ def test_returns_recoverable_diagnostics_with_utf8_byte_spans() -> None:
     assert result["document"]["span"]["endByte"] == len(source.encode())
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        "\\{}《《傍点》》\n\n\\[{東京|とう.きょう}",
+        "👨‍👩‍👧 [[em:**強調**]] [^n]\n\n[^n]: 注",
+        "[[indent:2]]\n{𠮟る|しか.る} [[no-break:^12^]]\n\n[[pagebreak:left]]",
+        "```mdi\n{東京|とうきょう}\n```\n\n| a | b |\n| - | - |\n| [[em:x]] | ^12^ |",
+    ],
+)
+def test_keeps_the_js_adversarial_corpus_inside_the_rust_wire_contract(
+    source: str,
+) -> None:
+    result = mdi.parse(source)
+
+    assert result["document"]["span"] == {
+        "startByte": 0,
+        "endByte": len(source.encode()),
+    }
+    assert_valid_spans(result["document"], source)
+    assert mdi.render_html(source).startswith("<!DOCTYPE html>")
+    assert mdi.parse(mdi.serialize_mdi(source))["irVersion"] == mdi.MDI_IR_VERSION
+
+
 def test_serializes_and_renders_complete_source_in_rust() -> None:
     source = "# 題\n\n{東京|とうきょう} ^12^"
     assert "<h1>題</h1>" in mdi.render_html(source)
