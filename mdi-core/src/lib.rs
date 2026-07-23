@@ -3221,7 +3221,10 @@ mod tests {
         ] {
             let rendered = render_text(source);
             assert_eq!(rendered.trim_end(), expected, "source: {source:?}");
-            assert!(parse_output(source).diagnostics.is_empty(), "source: {source:?}");
+            assert!(
+                parse_output(source).diagnostics.is_empty(),
+                "source: {source:?}"
+            );
         }
     }
 
@@ -3473,9 +3476,21 @@ mod tests {
     fn renders_every_documented_mdi_construct_in_vertical_html() {
         let vertical = "---\ntitle: 構文\nlang: ja\nwriting-mode: vertical\n---\n\n";
         for (name, source, expected) in [
-            ("front matter", "# 見出し", "<html lang=\"ja\" style=\"writing-mode: vertical-rl;\">"),
-            ("group ruby", "{東京|とうきょう}", "<ruby class=\"mdi-ruby\">東京"),
-            ("split ruby", "{東京|とう.きょう}", "<ruby class=\"mdi-ruby\""),
+            (
+                "front matter",
+                "# 見出し",
+                "<html lang=\"ja\" style=\"writing-mode: vertical-rl;\">",
+            ),
+            (
+                "group ruby",
+                "{東京|とうきょう}",
+                "<ruby class=\"mdi-ruby\">東京",
+            ),
+            (
+                "split ruby",
+                "{東京|とう.きょう}",
+                "<ruby class=\"mdi-ruby\"",
+            ),
             ("tate-chu-yoko", "^12^", "<span class=\"mdi-tcy\">12</span>"),
             ("default boten", "[[em:傍点]]", "class=\"mdi-em\""),
             ("custom boten", "[[em:※:任意]]", "--mdi-em:&quot;※&quot;"),
@@ -3484,20 +3499,43 @@ mod tests {
             ("blank backslash", "\\", "<p class=\"mdi-blank\"></p>"),
             ("blank br", "<br>", "<p class=\"mdi-blank\"></p>"),
             ("blank br slash", "<br />", "<p class=\"mdi-blank\"></p>"),
-            ("blank legacy macro", "[[blank]]", "<p class=\"mdi-blank\"></p>"),
+            (
+                "blank legacy macro",
+                "[[blank]]",
+                "<p class=\"mdi-blank\"></p>",
+            ),
             ("warichu", "[[warichu:割注]]", "class=\"mdi-warichu\""),
             ("kerning", "[[kern:-0.1em:詰め]]", "--mdi-kern:-0.1em"),
             ("indent", "[[indent:2]]\n字下げ", "class=\"mdi-indent\""),
-            ("bottom alignment", "[[bottom]]\n地付き", "class=\"mdi-bottom\""),
+            (
+                "bottom alignment",
+                "[[bottom]]\n地付き",
+                "class=\"mdi-bottom\"",
+            ),
             ("bottom shift", "[[bottom:2]]\n地付き", "--mdi-shift:2"),
             ("page break", "[[pagebreak]]", "class=\"mdi-pagebreak\""),
-            ("recto page break", "[[pagebreak:right]]", "class=\"mdi-pagebreak mdi-pagebreak-right\""),
-            ("verso page break", "[[pagebreak:left]]", "class=\"mdi-pagebreak mdi-pagebreak-left\""),
+            (
+                "recto page break",
+                "[[pagebreak:right]]",
+                "class=\"mdi-pagebreak mdi-pagebreak-right\"",
+            ),
+            (
+                "verso page break",
+                "[[pagebreak:left]]",
+                "class=\"mdi-pagebreak mdi-pagebreak-left\"",
+            ),
             ("footnote", "脚注[^n]\n\n[^n]: 注", "data-footnotes"),
-            ("escaped delimiters", "\\{ \\} \\| \\^ \\[ \\: \\《 \\》", "{ } | ^ [ : 《 》"),
+            (
+                "escaped delimiters",
+                "\\{ \\} \\| \\^ \\[ \\: \\《 \\》",
+                "{ } | ^ [ : 《 》",
+            ),
         ] {
             let html = render_html(&format!("{vertical}{source}"));
-            assert!(html.contains(expected), "missing {name}: {expected}; rendered {html}");
+            assert!(
+                html.contains(expected),
+                "missing {name}: {expected}; rendered {html}"
+            );
         }
         assert!(render_html(&format!("{vertical}\\")).contains(".mdi-blank{min-block-size:1lh}"));
     }
