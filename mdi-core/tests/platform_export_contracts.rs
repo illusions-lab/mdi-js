@@ -77,6 +77,11 @@ fn narou_boten_is_composed_only_from_documented_valid_one_character_ruby() {
         render("漢字（説明）とASCII(test)", TextFormat::Narou),
         "漢字｜（説明）とASCII|(test)"
     );
+    assert_eq!(render("^12^", TextFormat::Narou), "12");
+    assert_eq!(
+        render("前\n\n[[pagebreak]]\n\n後", TextFormat::Narou),
+        "前\n\n後"
+    );
 }
 
 #[test]
@@ -141,6 +146,10 @@ fn aozora_uses_documented_range_annotations_for_nested_markup() {
         "［＃傍点］｜東京《とうきょう》［＃傍点終わり］"
     );
     assert_eq!(
+        render("# [[em:強調]]", TextFormat::Aozora),
+        "［＃中見出し］［＃傍点］強調［＃傍点終わり］［＃中見出し終わり］"
+    );
+    assert_eq!(
         render(
             "^12^、[[warichu:割り注]]、[[em:﹆:白点]]",
             TextFormat::Aozora
@@ -173,11 +182,12 @@ fn aozora_assigns_heading_sizes_from_the_documented_hierarchy_rules() {
 
 #[test]
 fn aozora_maps_layout_blocks_to_the_official_annotations() {
-    let source = "[[indent:12]]\n字下げ\n\n[[bottom]]\n地付き\n\n[[bottom:3]]\n地寄せ\n\n[[pagebreak]]\n\n[[pagebreak:left]]\n\n[[pagebreak:right]]";
+    let source = "[[indent:12]]\n字下げ\n\n[[indent:104567890]]\n全数字\n\n[[bottom]]\n地付き\n\n[[bottom:3]]\n地寄せ\n\n[[pagebreak]]\n\n[[pagebreak:left]]\n\n[[pagebreak:right]]";
     assert_eq!(
         render(source, TextFormat::Aozora),
         concat!(
             "［＃１２字下げ］字下げ\r\n",
+            "［＃１０４５６７８９０字下げ］全数字\r\n",
             "［＃地付き］地付き\r\n",
             "［＃地から３字上げ］地寄せ\r\n",
             "［＃改ページ］\r\n",

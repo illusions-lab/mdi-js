@@ -1380,7 +1380,6 @@ fn aozora_heading_size(depth: u64, heading_depths: &[u64]) -> Option<&'static st
         .iter()
         .position(|candidate| *candidate == depth)?;
     match heading_depths.len() {
-        0 => None,
         1 => Some("中"),
         2 => ["大", "中"].get(index).copied(),
         _ => ["大", "中", "小"].get(index).copied(),
@@ -1413,21 +1412,16 @@ fn text_format_block_prefix(node: &serde_json::Value, format: TextFormat) -> Str
 fn fullwidth_digits(value: u64) -> String {
     value
         .to_string()
-        .chars()
-        .map(|character| match character {
-            '0' => '０',
-            '1' => '１',
-            '2' => '２',
-            '3' => '３',
-            '4' => '４',
-            '5' => '５',
-            '6' => '６',
-            '7' => '７',
-            '8' => '８',
-            '9' => '９',
-            _ => character,
-        })
-        .collect()
+        .replace('0', "０")
+        .replace('1', "１")
+        .replace('2', "２")
+        .replace('3', "３")
+        .replace('4', "４")
+        .replace('5', "５")
+        .replace('6', "６")
+        .replace('7', "７")
+        .replace('8', "８")
+        .replace('9', "９")
 }
 
 fn text_format_inline_children(
