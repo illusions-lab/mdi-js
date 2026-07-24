@@ -1147,6 +1147,15 @@ pub fn render_html_document(document: &Document) -> String {
     } else {
         ""
     };
+    // Browsers keep wheel input on the physical vertical axis, while a
+    // vertical-rl document overflows horizontally. Translate ordinary wheel
+    // movement into the reading axis so a standalone exported document is
+    // comfortable to read without a horizontal scrollbar drag.
+    let wheel_scroll = if vertical {
+        VERTICAL_WHEEL_SCROLL_SCRIPT
+    } else {
+        ""
+    };
     let mut body = String::new();
     let mut footnotes = Vec::new();
     for child in &document.children {
@@ -1176,7 +1185,7 @@ pub fn render_html_document(document: &Document) -> String {
         body.push_str("</ol></section>");
     }
     format!(
-        "<!DOCTYPE html><html lang=\"{}\"{}><head><meta charset=\"utf-8\">{}<style>{}</style></head><body>{}</body></html>",
+        "<!DOCTYPE html><html lang=\"{}\"{}><head><meta charset=\"utf-8\">{}<style>{}</style>{wheel_scroll}</head><body>{}</body></html>",
         escape_html(lang),
         writing_mode,
         title,
@@ -2538,6 +2547,8 @@ fn css_value(value: &str) -> String {
 /// The base stylesheet is intentionally shipped by the core alongside the
 /// semantic HTML. Hosts may add presentation CSS, but not reinterpret nodes.
 pub const MDI_STYLESHEET: &str = ".mdi-tcy{text-combine-upright:all}.mdi-nobr{white-space:nowrap}.mdi-warichu{font-size:.6em}.mdi-em{text-emphasis:var(--mdi-em,filled sesame)}.mdi-kern{letter-spacing:var(--mdi-kern)}.mdi-blank{min-block-size:1lh}.mdi-indent{margin-inline-start:calc(var(--mdi-indent)*1em)}.mdi-bottom{text-align:end}.mdi-pagebreak{break-after:page}";
+
+const VERTICAL_WHEEL_SCROLL_SCRIPT: &str = "<script>(function(){document.addEventListener('wheel',function(event){if(event.defaultPrevented||event.ctrlKey||event.shiftKey)return;var delta=event.deltaY;if(event.deltaMode===1)delta*=16;else if(event.deltaMode===2)delta*=window.innerWidth;if(!delta)return;var root=document.scrollingElement;var before=root.scrollLeft;window.scrollBy({left:-delta,behavior:'auto'});if(root.scrollLeft!==before)event.preventDefault()},{passive:false})})()</script>";
 
 #[derive(Debug, Clone)]
 pub struct EpubCover {
@@ -4492,6 +4503,11 @@ mod tests {
         assert!(html.contains("<h1>題</h1>"));
         assert!(html.contains("<ruby class=\"mdi-ruby\">東京<rp>（</rp><rt>とうきょう</rt>"));
         assert!(html.contains("<span class=\"mdi-tcy\">12</span>"));
+        assert!(html.contains("document.addEventListener('wheel'"));
+        assert!(html.contains("window.scrollBy({left:-delta,behavior:'auto'})"));
+
+        let horizontal = render_html("本文");
+        assert!(!horizontal.contains("document.addEventListener('wheel'"));
     }
 
     #[test]
@@ -4920,6 +4936,50 @@ mod tests {
         assert!(header.contains("NUMPAGES"));
         assert!(header.contains("<w:jc w:val=\"right\"/>"));
         assert!(zip.by_name("word/footnotes.xml").is_ok());
+    }
+
+    #[test]
+    fn configured_docx_applies_table_direction_rules() {
+        let vertical_table = render_docx_with_profile(
+            "| 項目 | 値 |\n| --- | --- |\n| セル | 縦書き |",
+            r#"{
+                "layout":{"system":"japanese-publisher"},
+                "typesetting":{"writingMode":"vertical","fontSize":10.5},
+                "pagination":{"pageSize":"A5","charactersPerLine":10,"linesPerPage":10,"gridMode":"typographic"}
+            }"#,
+        )
+        .unwrap();
+        let mut zip = ZipArchive::new(Cursor::new(vertical_table)).unwrap();
+        let mut document = String::new();
+        zip.by_name("word/document.xml")
+            .unwrap()
+            .read_to_string(&mut document)
+            .unwrap();
+        assert!(document.contains("<w:tblPr><w:bidiVisual/>"));
+        assert!(document.contains("<w:textDirection w:val=\"tbRl\"/>"));
+        assert!(document.contains("<w:tblBorders>"));
+        assert!(document.contains("<w:top w:val=\"single\""));
+        assert!(document.contains("<w:insideV w:val=\"single\""));
+
+        let horizontal_table = render_docx_with_profile(
+            "| Item | Value |\n| --- | --- |\n| Cell | Horizontal |",
+            r#"{
+                "layout":{"system":"word"},
+                "typesetting":{"writingMode":"horizontal","fontSize":11},
+                "pagination":{"pageSize":"A4","charactersPerLine":20,"linesPerPage":20,"gridMode":"typographic"}
+            }"#,
+        )
+        .unwrap();
+        let mut zip = ZipArchive::new(Cursor::new(horizontal_table)).unwrap();
+        let mut document = String::new();
+        zip.by_name("word/document.xml")
+            .unwrap()
+            .read_to_string(&mut document)
+            .unwrap();
+        assert!(!document.contains("<w:bidiVisual/>"));
+        assert!(!document.contains("<w:textDirection w:val=\"tbRl\"/>"));
+        assert!(document.contains("<w:tblBorders>"));
+        assert!(document.contains("<w:top w:val=\"single\""));
     }
 
     #[test]
